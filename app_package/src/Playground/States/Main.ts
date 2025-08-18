@@ -36,7 +36,11 @@ export class Main extends State {
             GuiFramework.formatButtonGrid(grid);
             grid.addControl(panel, 0, 0);
 
-            let logo = new Image("spacePirates", "assets/UI/spacePiratesLogo.svg");
+            const fallbackUrl = window.location.href.includes('/docs/') 
+                 ? window.location.origin + '/docs/' 
+                 : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+             const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+             let logo = new Image("spacePirates", Assets.joinUrl(assetsHostUrl, "/assets/UI/spacePiratesLogo.svg"));
             logo.width = 0.7;
             logo.fixedRatio = 340 / 1040;
             logo.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
@@ -90,7 +94,11 @@ export class Main extends State {
             panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
             panel.paddingBottom = "100px";
 
-            let logo = new Image("spacePirates", "assets/UI/spacePiratesLogo.svg");
+            const fallbackUrl = window.location.href.includes('/docs/') 
+                ? window.location.origin + '/docs/' 
+                : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+            const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+            let logo = new Image("spacePirates", Assets.joinUrl(assetsHostUrl, "/assets/UI/spacePiratesLogo.svg"));
             logo.width = 0.8;
             logo.fixedRatio = 340 / 1040;
             logo.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP

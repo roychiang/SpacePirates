@@ -25,9 +25,13 @@ export async function initializeBabylonApp(options: InitializeBabylonAppOptions)
     } else {
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
-        options.assetsHostUrl = window.location.href.split('?')[0];
+        // Only set assetsHostUrl if it's not already provided
         if (!options.assetsHostUrl) {
-            options.assetsHostUrl = "";
+            // Extract only the directory part, not the full URL with filename
+            options.assetsHostUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+            if (!options.assetsHostUrl) {
+                options.assetsHostUrl = "";
+            }
         }
         Parameters.starfieldHeavyShader = urlParams.get("heavyStarfield")! === "yes";
     }

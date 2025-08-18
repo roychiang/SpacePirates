@@ -16,7 +16,7 @@ export class PlanetBaker {
         this.renderTargetPlanet.activeCamera = camera;
         
         // planet
-        SceneLoader.AppendAsync(assetsHostUrl + "/assets/gltf/planet_mesh.glb").then((loadedScene: Scene) =>{
+        SceneLoader.AppendAsync(Assets.joinUrl(assetsHostUrl, "/assets/gltf/planet_mesh.glb")).then((loadedScene: Scene) =>{
             this.planet = scene.getMeshByName("planet_mesh");
             this.atmosphere = scene.getMeshByName("atmosphere_mesh");
             
@@ -31,14 +31,14 @@ export class PlanetBaker {
                 this.atmosphere.scaling.y = 4;
 
                 this.planet.scaling = new Vector3(3.6, 3.6, 3.6);
-                let shadowTexture = new Texture(assetsHostUrl + "/assets/textures/planet_shadow.jpg", scene, false, false)
+                let shadowTexture = new Texture(Assets.joinUrl(assetsHostUrl, "/assets/textures/planet_shadow.jpg"), scene, false, false)
         
                 // with alpha #ZI6R7T
-                NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/atmosphereShader.json", scene).then((atmosphereMaterial: NodeMaterial) => {
+                NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/atmosphereShader.json"), scene).then((atmosphereMaterial: NodeMaterial) => {
                     atmosphereMaterial.build(false);
                     atmosphereMaterial.alpha = 0.999;
                     atmosphereMaterial.alphaMode = Engine.ALPHA_COMBINE;
-                    NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/planetLightingShader.json", scene).then((planetLightingMaterial: NodeMaterial) => {
+                    NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/planetLightingShader.json"), scene).then((planetLightingMaterial: NodeMaterial) => {
                         planetLightingMaterial.build(false);
                         let planetBaseColor = planetLightingMaterial.getBlockByName("baseColorTex") as TextureBlock;
                         let planetRoughness = planetLightingMaterial.getBlockByName("roughnessTex") as TextureBlock;

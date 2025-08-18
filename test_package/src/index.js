@@ -4,7 +4,8 @@ let assetsHostUrl;
 if (DEV_BUILD) {
     assetsHostUrl = "";
 } else {
-    assetsHostUrl = "";
+    // For production builds, use the directory part of the current URL
+    assetsHostUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
 }
 
 // https://blog.typekit.com/2017/09/05/improving-your-web-font-performance/

@@ -41,7 +41,7 @@ class HUDPanel {
         adt.addControl(this._fpsCounter);
 */
         for(let i = 0; i < 20; i++) {
-            var image = new Image("img", assets.assetsHostUrl+"/assets/UI/trackerIcon.svg");
+            var image = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/trackerIcon.svg"));
             image.height = "32px";
             image.width = "32px";
             image.isVisible = false;
@@ -50,7 +50,7 @@ class HUDPanel {
             image.alpha = 0.4;
         }
 
-        this._targetLock = new Image("img", assets.assetsHostUrl+"/assets/UI/missileLockIcon.svg");
+        this._targetLock = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/missileLockIcon.svg"));
         this._targetLock.height = "128px";
         this._targetLock.width = "128px";
         this._targetLock.sourceWidth = 256;
@@ -101,7 +101,11 @@ class HUDPanel {
         }
         adt.addControl(this._statsPanel)
 
-        this._statsPanelImage = new Image("statsPanelImage", "/assets/UI/statsPanel.svg");
+        const fallbackUrl = window.location.href.includes('/docs/') 
+            ? window.location.origin + '/docs/' 
+            : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+        const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+        this._statsPanelImage = new Image("statsPanelImage", Assets.joinUrl(assetsHostUrl, "/assets/UI/statsPanel.svg"));
         this._statsPanelImage.widthInPixels = 300;
         this._statsPanelImage.heightInPixels = 185;
         this._statsPanelImage.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
@@ -128,17 +132,17 @@ class HUDPanel {
         this._statsPanel.addControl(this._statsGrid);
 
         let size = (InputManager.isTouch) ? 10 : 35;
-        this._healthIcon = new Image("health", "/assets/UI/healthIcon.svg");
+        this._healthIcon = new Image("health", Assets.joinUrl(assetsHostUrl, "/assets/UI/healthIcon.svg"));
         this._healthIcon.widthInPixels = size;
         this._healthIcon.heightInPixels = size;
         this._statsGrid.addControl(this._healthIcon, 0, 0);
 
-        this._speedIcon = new Image("health", "/assets/UI/speedIcon.svg");
+        this._speedIcon = new Image("health", Assets.joinUrl(assetsHostUrl, "/assets/UI/speedIcon.svg"));
         this._speedIcon.widthInPixels = size;
         this._speedIcon.heightInPixels = size;
         this._statsGrid.addControl(this._speedIcon, 1, 0);
 
-        this._reloadIcon = new Image("health", "/assets/UI/reloadIcon.svg");
+        this._reloadIcon = new Image("health", Assets.joinUrl(assetsHostUrl, "/assets/UI/reloadIcon.svg"));
         this._reloadIcon.widthInPixels = size;
         this._reloadIcon.heightInPixels = size;
         this._statsGrid.addControl(this._reloadIcon, 2, 0);

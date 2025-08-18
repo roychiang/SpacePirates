@@ -51,14 +51,36 @@ export class Assets {
     public projectile: Nullable<AbstractMesh> = null;
 
     public static loadingComplete: boolean = false;
+    public static globalAssetsHostUrl: string;
+
+    // Helper function to properly join URLs without double slashes
+    public static joinUrl(baseUrl: string, path: string): string {
+        // Remove trailing slash from baseUrl and leading slash from path to avoid double slashes
+        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const cleanPath = path.replace(/^\//, '');
+        const result = `${cleanBaseUrl}/${cleanPath}`;
+        
+        // Comprehensive debug logging to track URL construction
+        console.log(`[DEBUG joinUrl] CALLED: baseUrl='${baseUrl}', path='${path}'`);
+        console.log(`[DEBUG joinUrl] CLEANED: cleanBaseUrl='${cleanBaseUrl}', cleanPath='${cleanPath}'`);
+        console.log(`[DEBUG joinUrl] RESULT: '${result}'`);
+        console.log(`[DEBUG joinUrl] HAS_DOUBLE_SLASH: ${result.includes('//')}`);
+        
+        return result;
+    }
 
     constructor(scene:Scene, assetsHostUrl: string, whenReady: (assets:Assets) => void, whenLoadingComplete: (assets:Assets) => void)
     {
+        // Debug logging for assetsHostUrl
+        console.log(`[DEBUG Assets] Constructor called with assetsHostUrl: '${assetsHostUrl}'`);
+        console.log(`[DEBUG Assets] assetsHostUrl ends with slash: ${assetsHostUrl.endsWith('/')}`);
+        console.log(`[DEBUG Assets] assetsHostUrl length: ${assetsHostUrl.length}`);
             var _this = this;
-            this.assetsHostUrl = assetsHostUrl;
+        this.assetsHostUrl = assetsHostUrl;
+        Assets.globalAssetsHostUrl = assetsHostUrl;
             
             // add in IBL with linked environment
-            this.envCube = CubeTexture.CreateFromPrefilteredData(assetsHostUrl + "/assets/env/environment.env", scene);
+            this.envCube = CubeTexture.CreateFromPrefilteredData(Assets.joinUrl(assetsHostUrl, "/assets/env/environment.env"), scene);
             this.envCube.name = "environment";
             this.envCube.gammaSpace = false;
             this.envCube.rotationY = 1.977;
@@ -70,7 +92,7 @@ export class Assets {
 
             // MINIMAL loading
             var assetsManagerMinimal = new AssetsManager(scene);
-            var valkyrieTask = assetsManagerMinimal.addMeshTask("valkyrieTask", "", assetsHostUrl + "/assets/gltf/", "valkyrie_mesh.glb");
+            var valkyrieTask = assetsManagerMinimal.addMeshTask("valkyrieTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "valkyrie_mesh.glb");
             valkyrieTask.onSuccess = function (task: MeshAssetTask) {
                 _this.valkyrie = task.loadedMeshes[0];
                 _this.valkyrie.getChildTransformNodes().forEach((m: TransformNode) => {
@@ -81,7 +103,7 @@ export class Assets {
                 });
             };
 
-            var starsGeoTask = assetsManagerMinimal.addMeshTask("starsGeoTask", "", assetsHostUrl + "/assets/gltf/", "starsGeo.glb");
+            var starsGeoTask = assetsManagerMinimal.addMeshTask("starsGeoTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "starsGeo.glb");
             starsGeoTask.onSuccess = function (task: MeshAssetTask) {
                 _this.starfield = task.loadedMeshes[1];
                 if (_this.starfield) {
@@ -90,32 +112,32 @@ export class Assets {
                 }
             };
 
-            var thrusterTask = assetsManagerMinimal.addMeshTask("thrusterTask", "", assetsHostUrl + "/assets/gltf/", "thrusterFlame_mesh.glb");
+            var thrusterTask = assetsManagerMinimal.addMeshTask("thrusterTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "thrusterFlame_mesh.glb");
             thrusterTask.onSuccess = function (task: MeshAssetTask) {
                 _this.thrusterMesh = task.loadedMeshes[1];
             };
 
-            var vortexTask = assetsManagerMinimal.addMeshTask("vortexTask", "", assetsHostUrl + "/assets/gltf/", "vortex_mesh.glb");
+            var vortexTask = assetsManagerMinimal.addMeshTask("vortexTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "vortex_mesh.glb");
             vortexTask.onSuccess = function (task: MeshAssetTask) {
                 _this.vortexMesh = task.loadedMeshes[1];
             };
 
             assetsManagerMinimal.onTasksDoneObservable.add(() => {
 
-                NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/thrusterFlame.json", scene).then((nodeMaterial) => {
+                NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/thrusterFlame.json"), scene).then((nodeMaterial) => {
                     _this.thrusterShader = nodeMaterial.clone("thrusterMaterial", true);
                     _this.thrusterShader.backFaceCulling = false;
                     _this.thrusterShader.alphaMode = 1;
-                    NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/vortex.json", scene).then((nodeMaterial) => {
+                    NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/vortex.json"), scene).then((nodeMaterial) => {
                         _this.vortexShader = nodeMaterial.clone("vortexMaterial", true);
                         _this.vortexShader.backFaceCulling = false;
                         _this.vortexShader.alphaMode = 1;
 
                         const starfieldShaderName = Parameters.starfieldHeavyShader ? "/assets/shaders/starfieldShaderHeavy.json" : "/assets/shaders/starfieldShader.json";
-                        NodeMaterial.ParseFromFileAsync("", assetsHostUrl + starfieldShaderName, scene).then((nodeMaterial) => {
+                        NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, starfieldShaderName), scene).then((nodeMaterial) => {
                             //nodeMaterial.build(false);
                             if (_this.starfield) {
-                                const starfieldTexture = new Texture(assetsHostUrl + "/assets/textures/starfield_panorama_texture_mini.jpg", scene, false, false);
+                                const starfieldTexture = new Texture(Assets.joinUrl(assetsHostUrl, "/assets/textures/starfield_panorama_texture_mini.jpg"), scene, false, false);
                                 if(nodeMaterial.getBlockByName("emissiveTex")) {
                                     _this.starfieldTextureBlock = nodeMaterial.getBlockByName("emissiveTex");
                                     (_this.starfieldTextureBlock as TextureBlock).texture = starfieldTexture;
@@ -146,7 +168,7 @@ export class Assets {
         // COMPLETE loading
         var _this = this;
         var assetsManager = new AssetsManager(scene);
-        var raiderTask = assetsManager.addMeshTask("raiderTask", "", assetsHostUrl + "/assets/gltf/", "raider_mesh.glb");
+        var raiderTask = assetsManager.addMeshTask("raiderTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "raider_mesh.glb");
         raiderTask.onSuccess = function (task: MeshAssetTask) {
             _this.raider = task.loadedMeshes[0];
             _this.raider.getChildTransformNodes().forEach((m: TransformNode) => {
@@ -157,22 +179,22 @@ export class Assets {
             });
         };
 
-        var explosionMeshTask = assetsManager.addMeshTask("explosionMeshTask", "", assetsHostUrl + "/assets/gltf/", "explosionSpheres_mesh.glb");
+        var explosionMeshTask = assetsManager.addMeshTask("explosionMeshTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "explosionSpheres_mesh.glb");
         explosionMeshTask.onSuccess = function (task: MeshAssetTask) {
             _this.explosionMesh = task.loadedMeshes[1];
             _this.explosionMesh.parent = null;
             _this.explosionMesh.material?.dispose();
         };
-        var asteroidsTask = assetsManager.addContainerTask("asteroidsTask", "", assetsHostUrl + "/assets/gltf/", "asteroids_meshes.glb");
+        var asteroidsTask = assetsManager.addContainerTask("asteroidsTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "asteroids_meshes.glb");
         asteroidsTask.onSuccess = function (task: ContainerAssetTask) {
             _this.asteroidMeshes = task.loadedContainer;
         };
-        var asteroidsTask = assetsManager.addContainerTask("asteroidsTask", "", assetsHostUrl + "/assets/gltf/", "asteroid_V1.glb");
+        var asteroidsTask = assetsManager.addContainerTask("asteroidsTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "asteroid_V1.glb");
         asteroidsTask.onSuccess = function (task: ContainerAssetTask) {
             _this.asteroidLocation = task.loadedContainer;
         };
 
-        var projectileTask = assetsManager.addMeshTask("projectileTask", "", assetsHostUrl + "/assets/gltf/", "projectile_mesh.glb");
+        var projectileTask = assetsManager.addMeshTask("projectileTask", "", Assets.joinUrl(assetsHostUrl, "/assets/gltf/"), "projectile_mesh.glb");
         projectileTask.onSuccess = function (task: MeshAssetTask) {
             _this.projectile = task.loadedMeshes[1];
             _this.projectile.scaling = new Vector3(100,100,100);
@@ -180,41 +202,41 @@ export class Assets {
             (_this.projectile as any).bakeTransformIntoVertices(_this.projectile.computeWorldMatrix(true));
             _this.projectile.setEnabled(false);
         };
-        var missionsTask = assetsManager.addTextFileTask("missionsTask", assetsHostUrl + "/assets/missions.json");
+        var missionsTask = assetsManager.addTextFileTask("missionsTask", Assets.joinUrl(assetsHostUrl, "/assets/missions.json"));
         missionsTask.onSuccess = function (task: TextFileAssetTask) {
             Assets.missions = JSON.parse(task.text);
         };
 
-        this.sunTexture = new Texture(assetsHostUrl + "/assets/textures/sun.png", scene, true, false, Texture.BILINEAR_SAMPLINGMODE);
+        this.sunTexture = new Texture(Assets.joinUrl(assetsHostUrl, "/assets/textures/sun.png"), scene, true, false, Texture.BILINEAR_SAMPLINGMODE);
 
         assetsManager.onTasksDoneObservable.add(() => {
-            NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/shields.json", scene).then((nodeMaterial) => {
+            NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/shields.json"), scene).then((nodeMaterial) => {
                 _this.shieldEffectMaterial = nodeMaterial;
 
-                NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/projectileUVShader.json", scene).then((nodeMaterial) => {
+                NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/projectileUVShader.json"), scene).then((nodeMaterial) => {
                     //NodeMaterial.ParseFromSnippetAsync("19ALD5#7", scene).then((nodeMaterial:any) => {
                     _this.projectileShader = nodeMaterial.clone("projectileMaterial", true);
-                    NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/TrailShader.json", scene).then((nodeMaterial) => {
+                    NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/TrailShader.json"), scene).then((nodeMaterial) => {
                     //NodeMaterial.ParseFromSnippetAsync("NLDUNC#8", scene).then((nodeMaterial:any) => {
                             _this.trailMaterial = nodeMaterial.clone("trailMaterial", true);
-                        NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/explosionLayeredShader.json", scene).then((nodeMaterial) => {
+                        NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/explosionLayeredShader.json"), scene).then((nodeMaterial) => {
                             _this.explosionMaterial = nodeMaterial.clone("explosionMaterial", true);
                             //nodeMaterial.getBlockByName("startTime").value = nodeMaterial.getBlockByName("Time").value;
-                            (_this.explosionMaterial.getBlockByName("noiseTex") as TextureBlock).texture = new Texture(assetsHostUrl + "/assets/textures/noise_squareMask.png", scene, false, false);
+                            (_this.explosionMaterial.getBlockByName("noiseTex") as TextureBlock).texture = new Texture(Assets.joinUrl(assetsHostUrl, "/assets/textures/noise_squareMask.png"), scene, false, false);
                             _this.explosionMaterial.backFaceCulling = false;
                             _this.explosionMaterial.alphaMode = 1;
-                            NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/planetShaderGreybox.json", scene).then((nodeMaterial) => {
+                            NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/planetShaderGreybox.json"), scene).then((nodeMaterial) => {
                                 _this.planetMaterial = nodeMaterial;
-                                NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/SparksShader.json", scene).then((nodeMaterial) => {
+                                NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/SparksShader.json"), scene).then((nodeMaterial) => {
                                     _this.sparksEffect = nodeMaterial;
-                                    NodeMaterial.ParseFromFileAsync("", assetsHostUrl + "/assets/shaders/asteroidsTriplanarShader.json", scene).then((nodeMaterial) => {
+                                    NodeMaterial.ParseFromFileAsync("", Assets.joinUrl(assetsHostUrl, "/assets/shaders/asteroidsTriplanarShader.json"), scene).then((nodeMaterial) => {
                                         _this.asteroidsTriPlanar = nodeMaterial;
 
                                         if (Parameters.enableAudio) {
                                             this.audio = new AudioAssets(assetsHostUrl, scene);
                                         }
 
-                                        const starfieldTexture = new Texture(assetsHostUrl + "/assets/textures/starfield_panorama_texture.jpg", scene, false, false);
+                                        const starfieldTexture = new Texture(Assets.joinUrl(assetsHostUrl, "/assets/textures/starfield_panorama_texture.jpg"), scene, false, false);
                                         if(_this.starfieldTextureBlock) {
                                             (_this.starfieldTextureBlock as TextureBlock).texture = starfieldTexture;
                                         }
@@ -256,79 +278,79 @@ class AudioAssets {
     private _soundCount = 6;
 
     constructor(assetsHostUrl: string, scene: Scene) {
-        this.explosionSounds = [new Sound("explosion", assetsHostUrl + "/assets/sounds/explosions/explosion1.mp3", scene, this.soundReady, {
+        this.explosionSounds = [new Sound("explosion", Assets.joinUrl(assetsHostUrl, "/assets/sounds/explosions/explosion1.mp3"), scene, this.soundReady, {
                 spatialSound: true,
                 distanceModel: "exponential",
                 rolloffFactor: 0.2,
                 volume: 2
             }),
-            new Sound("explosion", assetsHostUrl + "/assets/sounds/explosions/explosion2.mp3", scene, this.soundReady, {
+            new Sound("explosion", Assets.joinUrl(assetsHostUrl, "/assets/sounds/explosions/explosion2.mp3"), scene, this.soundReady, {
                 spatialSound: true,
                 distanceModel: "exponential",
                 rolloffFactor: 0.2,
                 volume: 2
             })];
 
-        this.heroLaserSounds = [new Sound("laser", assetsHostUrl + "/assets/sounds/heroShip/heroLaser1.mp3", scene, this.soundReady, {
+        this.heroLaserSounds = [new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/heroLaser1.mp3"), scene, this.soundReady, {
                 spatialSound: false,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             }),
-            new Sound("laser", assetsHostUrl + "/assets/sounds/heroShip/heroLaser2.mp3", scene, this.soundReady, {
+            new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/heroLaser2.mp3"), scene, this.soundReady, {
                 spatialSound: false,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             }),
-            new Sound("laser", assetsHostUrl + "/assets/sounds/heroShip/heroLaser3.mp3", scene, this.soundReady, {
+            new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/heroLaser3.mp3"), scene, this.soundReady, {
                 spatialSound: false,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             })];
-        this.raiderLaserSounds = [new Sound("laser", assetsHostUrl + "/assets/sounds/raider/raiderLaser1.mp3", scene, this.soundReady, {
+        this.raiderLaserSounds = [new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/raider/raiderLaser1.mp3"), scene, this.soundReady, {
                 spatialSound: true,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             }),
-            new Sound("laser", assetsHostUrl + "/assets/sounds/raider/raiderLaser2.mp3", scene, this.soundReady, {
+            new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/raider/raiderLaser2.mp3"), scene, this.soundReady, {
                 spatialSound: true,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             }),
-            new Sound("laser", assetsHostUrl + "/assets/sounds/raider/raiderLaser3.mp3", scene, this.soundReady, {
+            new Sound("laser", Assets.joinUrl(assetsHostUrl, "/assets/sounds/raider/raiderLaser3.mp3"), scene, this.soundReady, {
                 spatialSound: true,
                 distanceModel: "exponential",
                 rolloffFactor: 1,
                 volume: 1
             })];
 
-        this.thrusterSound = new Sound("thruster", assetsHostUrl + "/assets/sounds/heroShip/thrusterFire_000.ogg", scene, this.soundReady, {
+        this.thrusterSound = new Sound("thruster", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/thrusterFire_000.ogg"), scene, this.soundReady, {
             autoplay: true,
             loop: true,
             volume: 0
         });
-        this.heroEngineSound = new Sound("engine", assetsHostUrl + "/assets/sounds/heroShip/heroShipFlying.mp3", scene, this.soundReady, {
+        this.heroEngineSound = new Sound("engine", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/heroShipFlying.mp3"), scene, this.soundReady, {
             autoplay: true,
             loop: true,
             volume: 1
         });
-        /*this.raiderEngineSound = new Sound("engine", assetsHostUrl + "/assets/sounds/raider/raiderFlying.mp3", scene, this.soundReady, {
+        /*this.raiderEngineSound = new Sound("engine", Assets.joinUrl(assetsHostUrl, "/assets/sounds/raider/raiderFlying.mp3"), scene, this.soundReady, {
             autoplay: true,
             loop: true,
             volume: 0.1
         });*/
 
-        this.laserHitSound = new Sound("laserHit", assetsHostUrl + "/assets/sounds/raider/raiderHitByLaser", scene, this.soundReady, {
+        this.laserHitSound = new Sound("laserHit", Assets.joinUrl(assetsHostUrl, "/assets/sounds/raider/raiderHitByLaser"), scene, this.soundReady, {
             spatialSound: true,
             distanceModel: "exponential",
             rolloffFactor: 0.7,
             volume: 3
         });
-        this.missileFireSound = new Sound("missileFire", assetsHostUrl + "/assets/sounds/heroShip/rocketLaunch.mp3", scene, this.soundReady, {
+        this.missileFireSound = new Sound("missileFire", Assets.joinUrl(assetsHostUrl, "/assets/sounds/heroShip/rocketLaunch.mp3"), scene, this.soundReady, {
             spatialSound: true,
             distanceModel: "exponential",
             rolloffFactor: 1,

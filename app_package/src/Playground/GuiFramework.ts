@@ -1,5 +1,6 @@
 import { Engine, Vector2 } from "@babylonjs/core";
 import { Control, Button, Grid, StackPanel, Image, CornerHandle, AdvancedDynamicTexture, TextBlock, Rectangle, Slider, Checkbox, RadioButton } from "@babylonjs/gui";
+import { Assets } from "./Assets";
 
 export class GuiFramework {
     public static guiFont = {
@@ -49,9 +50,13 @@ export class GuiFramework {
     }
 
     public static createBottomBar(adt: AdvancedDynamicTexture) {
-        let bottomBarLeft: Image = new Image("bottomBarLeft", "/assets/UI/bottomBarLeft.svg");
-        let bottomBarCenter: Image = new Image("bottomBarCenter", "/assets/UI/bottomBarCenter.svg");
-        let bottomBarRight: Image = new Image("bottomBarRight", "/assets/UI/bottomBarRight.svg");
+        const fallbackUrl = window.location.href.includes('/docs/') 
+            ? window.location.origin + '/docs/' 
+            : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+        const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+        let bottomBarLeft: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/bottomBarLeft.svg"));
+        let bottomBarCenter: Image = new Image("bottomBarCenter", Assets.joinUrl(assetsHostUrl, "/assets/UI/bottomBarCenter.svg"));
+        let bottomBarRight: Image = new Image("bottomBarRight", Assets.joinUrl(assetsHostUrl, "/assets/UI/bottomBarRight.svg"));
         let grid: Grid = new Grid();
         grid.addRowDefinition(270, true);
         grid.addColumnDefinition(645, true);
@@ -82,15 +87,19 @@ export class GuiFramework {
     }
 
     public static createTextPanel(parentGrid: Grid) {
-        let textPanelUL: Image = new Image("bottomBarLeft", "/assets/UI/textPanelUL.svg");
-        let textPanelUC: Image = new Image("bottomBarCenter", "/assets/UI/textPanelUC.svg");
-        let textPanelUR: Image = new Image("bottomBarRight", "/assets/UI/textPanelUR.svg");
-        let textPanelCL: Image = new Image("bottomBarLeft", "/assets/UI/textPanelCL.svg");
-        let textPanelCC: Image = new Image("bottomBarCenter", "/assets/UI/textPanelCC.svg");
-        let textPanelCR: Image = new Image("bottomBarRight", "/assets/UI/textPanelCR.svg");
-        let textPanelLL: Image = new Image("bottomBarLeft", "/assets/UI/textPanelLL.svg");
-        let textPanelLC: Image = new Image("bottomBarCenter", "/assets/UI/textPanelLC.svg");
-        let textPanelLR: Image = new Image("bottomBarRight", "/assets/UI/textPanelLR.svg");
+        const fallbackUrl = window.location.href.includes('/docs/') 
+            ? window.location.origin + '/docs/' 
+            : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+        const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+        let textPanelUL: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelUL.svg"));
+        let textPanelUC: Image = new Image("bottomBarCenter", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelUC.svg"));
+        let textPanelUR: Image = new Image("bottomBarRight", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelUR.svg"));
+        let textPanelCL: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelCL.svg"));
+        let textPanelCC: Image = new Image("bottomBarCenter", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelCC.svg"));
+        let textPanelCR: Image = new Image("bottomBarRight", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelCR.svg"));
+        let textPanelLL: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelLL.svg"));
+        let textPanelLC: Image = new Image("bottomBarCenter", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelLC.svg"));
+        let textPanelLR: Image = new Image("bottomBarRight", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelLR.svg"));
         let grid: Grid = new Grid();
         grid.clipChildren = false;
         grid.addRowDefinition(170, true);
@@ -333,7 +342,11 @@ export class GuiFramework {
     }
 
     public static addButton(label: string, panel: StackPanel): Button {
-        var button = Button.CreateImageButton("button", label.toUpperCase(), "/assets/UI/menuButton.svg");
+        const fallbackUrl = window.location.href.includes('/docs/') 
+            ? window.location.origin + '/docs/' 
+            : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+        const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+        var button = Button.CreateImageButton("button", label.toUpperCase(), Assets.joinUrl(assetsHostUrl, "/assets/UI/menuButton.svg"));
         let image: any = button.image;
         image.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         image.width = "400px";
