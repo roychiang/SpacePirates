@@ -84,6 +84,10 @@ export class Main extends State {
                 });
             }
 
+            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function(info) {
+                State.setCurrent(States.matchmaking);
+            });
+
             GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function(info) {
                 States.options.backDestination = States.main;
                 State.setCurrent(States.options);
@@ -145,6 +149,10 @@ export class Main extends State {
                     State.setCurrent(States.battleSelect);
                 });
             }
+
+            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function(info) {
+                State.setCurrent(States.matchmaking);
+            });
 
             GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function(info) {
                 States.options.backDestination = States.main;

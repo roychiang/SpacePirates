@@ -1,5 +1,5 @@
 import { Engine, Vector2 } from "@babylonjs/core";
-import { Control, Button, Grid, StackPanel, Image, CornerHandle, AdvancedDynamicTexture, TextBlock, Rectangle, Slider, Checkbox, RadioButton } from "@babylonjs/gui";
+import { Control, Button, Grid, StackPanel, Image, CornerHandle, AdvancedDynamicTexture, TextBlock, Rectangle, Slider, Checkbox, RadioButton, Ellipse } from "@babylonjs/gui";
 import { Assets } from "./Assets";
 
 export class GuiFramework {
@@ -85,6 +85,94 @@ export class GuiFramework {
         // portraitWarning.alpha = 0;
         // adt.addControl(portraitWarning);
     }
+
+    public static ensureGlobalTopLeftAvatar(adt: AdvancedDynamicTexture) {
+        const existing = adt.getControlByName("globalAvatarGrid")
+        if (!existing) {
+            this.createTopLeftAvatar(adt)
+        }
+        return adt.getControlByName("globalAvatarGrid") as Grid
+    }
+
+    public static createTopLeftAvatar(adt: AdvancedDynamicTexture) {
+        const grid = new Grid("globalAvatarGrid")
+        grid.addRowDefinition(80, true)
+        grid.addRowDefinition(1.0, false)
+        grid.addColumnDefinition(200, true)
+        grid.addColumnDefinition(1.0, false)
+        grid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+        grid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+        grid.topInPixels = 10
+        grid.leftInPixels = 80
+        const avatarWrapper = new Rectangle("globalAvatarWrapper")
+        avatarWrapper.width = "64px"
+        avatarWrapper.height = "64px"
+        avatarWrapper.thickness = 0
+        avatarWrapper.cornerRadius = 32
+        avatarWrapper.clipChildren = true
+        avatarWrapper.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+        const guestBg = new Rectangle("globalAvatarBg")
+        guestBg.width = "64px"
+        guestBg.height = "64px"
+        guestBg.thickness = 0
+        guestBg.background = "#1b2b33"
+        guestBg.cornerRadius = 32
+        const avatarImage = new Image("globalAvatarImage", "")
+        avatarImage.width = "64px"
+        avatarImage.height = "64px"
+        const guestQuestion = new TextBlock("globalAvatarQ")
+        this.setFont(guestQuestion, true, true)
+        guestQuestion.color = "#4f73ff"
+        guestQuestion.fontSize = 36
+        guestQuestion.text = "?"
+        guestQuestion.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER
+        guestQuestion.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
+        avatarWrapper.addControl(guestBg)
+        avatarWrapper.addControl(guestQuestion)
+        avatarWrapper.addControl(avatarImage)
+        const avatarRing = new Ellipse("globalAvatarRing")
+        avatarRing.width = "64px"
+        avatarRing.height = "64px"
+        avatarRing.color = "#a6fffa"
+        avatarRing.thickness = 2
+        avatarRing.background = "#688899"
+        const avatarCell = new StackPanel("globalAvatarCell")
+        avatarCell.width = "64px"
+        avatarCell.height = "64px"
+        avatarCell.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+        avatarCell.addControl(avatarWrapper)
+        avatarCell.addControl(avatarRing)
+        grid.addControl(avatarCell, 0, 0)
+        const name = new TextBlock("globalAvatarName")
+        this.setFont(name, true, true)
+        name.color = "white"
+        name.fontSize = 24
+        name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+        grid.addControl(name, 0, 1)
+        adt.addControl(grid)
+        return grid
+    }
+
+    public static updateTopLeftAvatar(name?: string, url?: string) {
+        const adt = this.currentAdt
+        if (!adt) return
+        const nameCtrl = adt.getControlByName("globalAvatarName") as TextBlock
+        const img = adt.getControlByName("globalAvatarImage") as Image
+        const bg = adt.getControlByName("globalAvatarBg") as Rectangle
+        const q = adt.getControlByName("globalAvatarQ") as TextBlock
+        if (nameCtrl && name) nameCtrl.text = name
+        if (img && url && url.length > 0) {
+            img.source = url
+            if (bg) bg.alpha = 0
+            if (q) q.alpha = 0
+        } else {
+            if (img) img.source = ""
+            if (bg) bg.alpha = 1
+            if (q) q.alpha = 1
+        }
+    }
+
+    
 
     public static createTextPanel(parentGrid: Grid) {
         const fallbackUrl = window.location.href.includes('/docs/') 

@@ -36,7 +36,10 @@ module.exports = {
         new DefinePlugin({
             DEV_BUILD: JSON.stringify(true)
         }),
-        new HtmlWebpackPlugin({ title: "Space Pirates made with Babylon.js" }),
+        new HtmlWebpackPlugin({
+            title: "Space Pirates made with Babylon.js",
+            template: path.resolve(__dirname, "src/index.html")
+        }),
         new CopyWebpackPlugin({
             patterns: [
                 {

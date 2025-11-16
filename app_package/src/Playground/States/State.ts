@@ -3,6 +3,9 @@ import { Nullable, Scene } from "@babylonjs/core";
 import { GameSession } from "./GameSession";
 import { GameState } from "./GameState";
 import { Parameters } from "../Parameters";
+import { GuiFramework } from "../GuiFramework";
+import { authService, avatarService } from "../../Viverse/Viverse";
+import { getViverse } from "../../Viverse/Viverse";
 
 export class State {
     static currentState: Nullable<State> = null;
@@ -38,6 +41,54 @@ export class State {
         this._adt.layer!.layerMask = 0x10000000;
         this._adt.idealHeight = 1440;
         window.addEventListener("resize", this._resizeListener);
+        if (this._adt) {
+            GuiFramework.setOrientation(this._adt)
+            GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
+            ;(async () => {
+                authService.initClient({ clientId: "v48pybqy7f", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
+                const attempt = async () => {
+                    const ts = new Date().toISOString()
+                    console.log("[Init] ts", ts)
+                    const info = await authService.checkAuth()
+                    const token = info ? info.access_token : undefined
+                    const sdkAvailable = !!getViverse()
+                    console.log("[SDK] available", sdkAvailable)
+                    console.log("[Auth] token", !!token)
+                    avatarService.init(token)
+                    const t0 = performance.now()
+                    const name = await authService.getDisplayName(token)
+                    const profile = await avatarService.getProfile()
+                    const url = avatarService.getHeadIconUrlOrDefault(profile)
+                    const t1 = performance.now()
+                    console.log("[Avatar] name", name, "url", url, "ts", new Date().toISOString(), "ms", Math.round(t1 - t0))
+                    GuiFramework.updateTopLeftAvatar(name, url)
+                    if (!token) {
+                        try {
+                            window.parent?.postMessage({ method: "initialize-auth" }, "*")
+                            console.log("[Auth] initialize-auth posted to parent")
+                        } catch {}
+                    }
+                }
+                const hasClient = !!getViverse()?.client || !!(globalThis as any).viverseClient
+                if (hasClient) {
+                    await attempt()
+                } else {
+                    let tries = 5
+                    const tick = async () => {
+                        const available = !!getViverse()?.client || !!(globalThis as any).viverseClient
+                        if (available) {
+                            await attempt()
+                        } else if (tries > 0) {
+                            tries--
+                            setTimeout(tick, 1000)
+                        } else {
+                            console.log("[SDK] not available after retries")
+                        }
+                }
+                    setTimeout(tick, 1000)
+                }
+            })()
+        }
     }
 
     // helpers

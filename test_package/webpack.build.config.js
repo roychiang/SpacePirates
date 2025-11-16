@@ -20,7 +20,10 @@ module.exports = {
         new DefinePlugin({
             DEV_BUILD: JSON.stringify(false)
         }),
-        new HtmlWebpackPlugin({ title: "Space Pirates made with Babylon.js" }),
+        new HtmlWebpackPlugin({
+            title: "Space Pirates made with Babylon.js",
+            template: path.resolve(__dirname, "src/index.html")
+        }),
         new CopyWebpackPlugin({
             patterns: [
                 {
@@ -39,7 +42,7 @@ module.exports = {
             new TerserPlugin({
                 terserOptions: {
                     compress: {
-                        drop_console: true,
+                        drop_console: false,
                         drop_debugger: true
                     }
                 }

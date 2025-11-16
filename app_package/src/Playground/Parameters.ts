@@ -121,7 +121,7 @@ export class Parameters {
         this.allyCount = 10;
         this.enemyCount = 10;
         this.recordFrameCount = 2000;
-        this.allowSplitScreen = true;
+        this.allowSplitScreen = false;
         this.recorderActive = true;
         this.enableAudio = true;
         this.starfieldHeavyShader = true;

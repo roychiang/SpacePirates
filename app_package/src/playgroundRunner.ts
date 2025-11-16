@@ -17,6 +17,7 @@ export interface InitializeBabylonAppOptions {
 export async function initializeBabylonApp(options: InitializeBabylonAppOptions) {
 
     Parameters.initialize();
+    console.log("[App] init start")
 
     useNative = !!_native;
 
@@ -36,9 +37,9 @@ export async function initializeBabylonApp(options: InitializeBabylonAppOptions)
         Parameters.starfieldHeavyShader = urlParams.get("heavyStarfield")! === "yes";
     }
     if (options.assetsHostUrl) {
-        console.log("Assets host URL: " + options.assetsHostUrl!);
+        console.log("[App] assetsHostUrl", options.assetsHostUrl!);
     } else {
-        console.log("No assets host URL provided");
+        console.log("[App] no assetsHostUrl");
     }
 
     if (!useNative) {
@@ -72,6 +73,7 @@ export async function initializeBabylonApp(options: InitializeBabylonAppOptions)
     let engine: Engine | WebGPUEngine | NativeEngine;
     if (useNative) {
         engine = new NativeEngine();
+        console.log("[App] engine", "NativeEngine")
     } else if (useWebGPU) {
         engine = new WebGPUEngine(canvas, {
             deviceDescriptor: {
@@ -89,18 +91,22 @@ export async function initializeBabylonApp(options: InitializeBabylonAppOptions)
         });
         await (engine as WebGPUEngine).initAsync();
         engine.compatibilityMode = false;
+        console.log("[App] engine", "WebGPUEngine")
     } else {
         const badOS = /iPad/i.test(navigator.userAgent) || /iPhone/i.test(navigator.userAgent);
         engine = new Engine(canvas, !badOS);
+        console.log("[App] engine", "Engine")
     }
 
     (window as any).engine = engine;
 
     const scene = CreatePlaygroundScene(engine, options.assetsHostUrl!, canvas);
+    console.log("[App] scene created")
     GuiFramework.updateScreenRatio(engine);
     engine.runRenderLoop(() => {
         scene.render();
     });
+    console.log("[App] render loop started")
     window.addEventListener("resize", () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;

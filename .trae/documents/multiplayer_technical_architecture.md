@@ -318,3 +318,135 @@ CREATE INDEX idx_player_game_states_user_id ON player_game_states(user_id);
 - 提供本地伺服器選項
 
 這個架構設計最小化了對現有程式碼的改動，同時提供了完整的多人遊戲功能。
+
+## 10. 前端服務介面契約（VIVERSE 對接）
+
+### 10.1 AuthService
+- `initClient(config: { clientId: string; domain: string; cookieDomain?: string }): void`
+- `checkAuth(): Promise<{ access_token: string; account_id: string; expires_in: number; state?: string } | undefined>`
+- `getToken(): Promise<string | undefined>`
+- `getDisplayName(token?: string): Promise<string>`（登入→Avatar `name`；未登入→`guest`）
+- `isGuest(): Promise<boolean>`
+
+### 10.2 AvatarService
+- `init(token?: string): void`
+- `getProfile(): Promise<{ name: string; activeAvatar: { headIconUrl: string; vrmUrl?: string } | null }>`
+- `getActiveAvatar(): Promise<{ headIconUrl: string; vrmUrl: string }>`
+- `getPublicAvatarList(): Promise<Avatar[]>`
+- `getAvatarFileWithSDK(url: string): Promise<ArrayBuffer>`
+- `getHeadIconUrlOrDefault(profile?: Profile): string`（未登入或無頭像→返回預設）
+
+### 10.3 PlayService
+- `init(): void`
+- `newMatchmakingClient(appId: string, debug?: boolean): Promise<MatchmakingClient>`
+- `setActor(actor: { session_id: string; name: string; properties: Record<string, number | string> }): Promise<{ success: boolean; message?: string }>`
+- `createRoom(cfg: { name: string; mode: 'team'; maxPlayers: number; minPlayers: number; properties?: Record<string, any> }): Promise<CreateRoomResult>`
+- `joinRoom(roomId: string): Promise<JoinRoomResult>`
+- `leaveRoom(): Promise<{ success: boolean; message?: string }>`
+- `closeRoom(): Promise<{ success: boolean; message?: string }>`
+- `getAvailableRooms(): Promise<{ success: boolean; rooms: Room[] }>`
+- `getMyRoomActors(): Promise<{ success: boolean; actors: Actor[] }>`
+- 事件（若SDK提供）：`on(event: 'roomUpdated' | 'actorJoined' | 'actorLeft' | 'readyStateChanged', handler)`
+
+### 10.4 UI 資料模型
+- `UserProfile`: `{ name: string; headIconUrl: string; activeAvatar?: Avatar | null }`（未登入時 `name = 'guest'`、`headIconUrl = default`）
+- `Actor`: `{ session_id: string; name: string; properties: Record<string, number | string> }`
+- `Room`: `{ id: string; app_id: string; mode: 'team'; name: string; actors: Actor[]; max_players: number; min_players: number; is_closed: boolean; properties: Record<string, any>; master_client_id: string; game_session: string; created_by_me: boolean }`
+- `PlayerUI`: `{ id: string; name: string; headIconUrl: string; ready: boolean; attributes: Record<string, number | string> }`
+
+## 11. UI 元件規格（沿用現有設計風格）
+
+### 11.1 AvatarBadge
+- 屬性：`size: 'sm'|'md'|'lg'`、`src: string`、`fallbackSrc: string`、`ring: 'none'|'thin'|'glow'`
+- 事件：`onClick()`
+- 狀態：`loading`、`error`、`guest`
+- 規範：圓形邊框、內陰影與輕微外光暈；尺寸統一（`sm=40px`、`md=64px`、`lg=96px`）。
+
+### 11.2 PlayerCard
+- 屬性：`name: string`、`headIconUrl: string`、`ready: boolean`、`attributes: Record<string, number|string>`
+- 事件：`onToggleReady(nextReady: boolean)`、`onSelect()`
+- 狀態：`idle`、`updating`、`disabled`
+- 規範：卡片式布局、圓形頭像、右上角準備狀態綠勾標記。
+
+### 11.3 PlayerList
+- 屬性：`players: PlayerCardProps[]`
+- 事件：`onPlayerAction(playerId, action)`
+- 狀態：`empty`、`populated`
+- 規範：自動換行栅格；加入/離開過渡動畫≤200ms。
+
+### 11.4 ReadyToggle
+- 屬性：`ready: boolean`、`disabled: boolean`
+- 事件：`onChange(nextReady: boolean)`
+- 狀態：`toggling`、`error`
+- 規範：與現有3D按鈕一致；切換時提供明確回饋。
+
+### 11.5 RoomHeader
+- 屬性：`room: { id; name; mode; maxPlayers; minPlayers; isClosed; properties }`
+- 事件：`onEditProperties(changes)`（房主）
+- 狀態：`loading`、`ready`
+- 規範：標題、模式徽章、玩家數、公開狀態。
+
+### 11.6 RoomControls
+- 屬性：`isMasterClient: boolean`、`allReady: boolean`
+- 事件：`onStartGame()`（房主）`onCloseRoom()`（房主）`onLeaveRoom()`
+- 狀態：`disabled`（非房主）
+- 規範：主操作採橙色主按鈕；非房主禁用與提示。
+
+### 11.7 QueuePanel
+- 屬性：`status: 'idle'|'queueing'|'matched'|'error'`、`estimatedWaitTime?: number`、`positionInQueue?: number`
+- 事件：`onCancelQueue()`
+- 狀態：`updating`、`timeout`
+- 規範：星塵進度條、數值展示；成功時彈性動畫提示。
+
+### 11.8 ModeCard（遠端雙人）
+- 屬性：`title`、`description`、`icon`
+- 事件：`onSelect(mode)`
+- 規範：沿用現有模式卡片樣式與圖標語言。
+
+### 11.9 StatusBar（主頁/配對）
+- 屬性：`auth: { isGuest: boolean; name: string; headIconUrl: string }`
+- 規範：與主頁玩家狀態一致（需求文件 3.2/4.2 規範）。
+
+### 11.10 RoomJoinForm
+- 屬性：`value: string`、`error?: string`
+- 事件：`onSubmit(roomId)`、`onChange(value)`
+- 規範：格式檢查、Enter提交、錯誤提示非侵入式。
+
+## 12. 實作計畫
+
+1. 服務層封裝：建立 `AuthService`、`AvatarService`、`PlayService`，統一初始化、錯誤處理、快取與回退（guest）。
+2. 主頁整合：於主頁狀態列加入 `StatusBar`（圓形頭像與名稱），快速配對入口沿用既有 `menuButton.svg` 樣式。
+3. 配對頁：實作 `QueuePanel` 與 `RoomJoinForm`；打通 `newMatchmakingClient`、`setActor`、`createRoom`/`joinRoom`/`leaveRoom` 流程；錯誤與超時回饋。
+4. 大廳頁：`RoomHeader`、`PlayerList`、`ReadyToggle`、`RoomControls`；整合 `getMyRoomActors()` 與房主權限操作（開始/關閉）。
+5. NetSync：沿用本地雙人玩法，加入輸入驅動與狀態增量同步；客戶端預測與房主權威修正；斷線重連恢復。
+6. 頭像一致性：提供預設(default)頭像資源；所有 2D 場景圓形顯示（40/64/96 尺寸）。
+
+## 13. 驗證方法
+
+- 本地 Stub 測試：
+  - `checkAuth()` 返回 `undefined` 或假憑證；`getProfile()` 返回假名稱與頭像；`newMatchmakingClient()` 回傳假房與演員列表。
+  - 以環境旗標 `USE_SDK_STUBS=true` 啟用；接口與行為與真 SDK 對齊。
+- 端到端（viverse.com）：
+  - 登入檢查（無重導）、建立/加入房間、準備機制、開始遊戲、結果頁、再玩一次。
+  - 邊界：憑證失效、房間滿員、斷線重連、超時取消。
+- 視覺/互動驗證：
+  - 尺寸、色彩、動效（≤200ms、ease-out）符合規格；圓形頭像與 guest 覆蓋完整。
+
+## 14. 測試用例（核心）
+
+- 主頁：guest 與登入顯示一致；快速配對按鈕動效與禁用態正確。
+- 配對：`createRoom`/`joinRoom` 成功與錯誤回饋；進度與隊列資訊準確；取消恢復狀態。
+- 大廳：加入/離開動畫；準備勾切換；房主開始遊戲權限；房主離開處理。
+- 戰鬥：雙人同步穩定；HUD 更新平滑；斷線重連可恢復。
+- 結果：統計面板與再玩一次流暢。
+
+## 15. 效能與網路監測
+
+- FPS：目標 60fps（最低 30fps）；於調試面板顯示。
+- 延遲：目標 ≤100ms（可接受 ≤200ms）；抖動時調整同步頻率。
+- 重連：≤5s 完成；記錄重連次數與時長。
+
+## 16. 交付物
+
+- 更新後的技術架構文檔（本章節）；服務層設計與接口說明。
+- 本地 `sdk-stubs` 使用指南；viverse.com E2E 測試清單與報告模板。

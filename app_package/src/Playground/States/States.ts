@@ -7,6 +7,8 @@ import { Main } from "./Main";
 import { Options } from "./Options";
 import { Victory } from "./Victory";
 import { PhotoMode } from "./PhotoMode";
+import { Matchmaking } from "./Matchmaking";
+import { Lobby } from "./Lobby";
 
 export class States {
     public static battleSelect = new BattleSelect;
@@ -18,5 +20,7 @@ export class States {
     public static options = new Options;
     public static victory = new Victory;
     public static photoMode = new PhotoMode;
+    public static matchmaking = new Matchmaking;
+    public static lobby = new Lobby;
 }
 
