@@ -36,9 +36,55 @@ export class InputManager {
     private static _scene: Scene;
     private static _keyboardObserver: Nullable<Observer<KeyboardInfo>> = null;
     public static input: Input = new Input;
+    // Support multiple player inputs; index 0 remains alias via `input`
+    public static inputs: Input[] = [InputManager.input];
     private static _canvas: HTMLCanvasElement;
     public static deltaTime: number = 0;
     public static isTouch = false;
+    // Patch navigator.getGamepads to avoid undefined id causing Babylon crash
+    private static _patchedGamepads = false;
+
+    public static getOrCreateInput(index: number): Input {
+        while (InputManager.inputs.length <= index) {
+            InputManager.inputs.push(new Input());
+        }
+        return InputManager.inputs[index];
+    }
+    private static sanitizeGamepadsSupport() {
+        if (InputManager._patchedGamepads) return;
+        try {
+            const nav: any = navigator as any;
+            if (nav && typeof nav.getGamepads === 'function') {
+                const original = nav.getGamepads.bind(nav);
+                nav.getGamepads = function() {
+                    try {
+                        const list = original() || [];
+                        return Array.prototype.map.call(list, (gp: any) => {
+                            if (!gp) return gp;
+                            try {
+                                return new Proxy(gp, {
+                                    get(target, prop) {
+                                        if (prop === 'id') {
+                                            return typeof target.id === 'string' ? target.id : '';
+                                        }
+                                        return (target as any)[prop];
+                                    }
+                                });
+                            } catch {
+                                if (typeof gp.id !== 'string') {
+                                    try { gp.id = ''; } catch {}
+                                }
+                                return gp;
+                            }
+                        });
+                    } catch {
+                        return [];
+                    }
+                }
+                InputManager._patchedGamepads = true;
+            }
+        } catch {}
+    }
 
     constructor(scene: Scene, canvas: HTMLCanvasElement)
     {
@@ -46,6 +92,9 @@ export class InputManager {
         InputManager._canvas = canvas;
 
         InputManager.isTouch = isTouchDevice();
+
+        // Ensure gamepad id is always a string to prevent Babylon GamepadManager errors
+        InputManager.sanitizeGamepadsSupport();
 
         InputManager.setupPointerLock();
 
@@ -80,7 +129,11 @@ export class InputManager {
             }
         });
         
-        GamepadInput.initialize();
+        try {
+            GamepadInput.initialize();
+        } catch (e) {
+            console.warn('Gamepad initialization failed, continuing without gamepad:', e);
+        }
     }
 
     static mouseMove(e: any)
@@ -88,9 +141,7 @@ export class InputManager {
         if (InputManager.isTouch) {
             return;
         }
-        if (GamepadInput.gamepads.length != 0) {
-            return;
-        }
+        // Do not suppress mouse when a gamepad is connected; allow keyboard+mouse co-op
         const deltaTime = InputManager.deltaTime;//._scene.getEngine().getDeltaTime();
 
         var movementX = e.movementX ||
@@ -103,7 +154,7 @@ export class InputManager {
                 e.webkitMovementY ||
                 0;
         
-        const input = InputManager.input;
+        const input = InputManager.getOrCreateInput(0);
         input.dx = movementX * Parameters.mouseSensitivty * deltaTime;
         input.dy = movementY * Parameters.mouseSensitivty * deltaTime;
         if (Settings.invertY) {

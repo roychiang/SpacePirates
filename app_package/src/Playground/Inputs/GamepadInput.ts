@@ -12,8 +12,13 @@ export class GamepadInput {
     public static initialize() {
         const gamepadManager = new GamepadManager();
         gamepadManager.onGamepadConnectedObservable.add((gamepad, state) => {
-            GamepadInput.gamepads.push(new GamepadInput(gamepad, InputManager.input));
-            console.log('gamepad connected');
+            // Reserve inputs[0] for keyboard/mouse; map gamepads starting at index 1
+            const inputIndex = GamepadInput.gamepads.length + 1;
+            const targetInput = InputManager.getOrCreateInput(inputIndex);
+            const gi = new GamepadInput(gamepad, targetInput);
+            GamepadInput.gamepads.push(gi);
+            const id = (gamepad as any)?.id ?? '';
+            console.log('[Gamepad] Connected', { id, index: inputIndex });
         })
         gamepadManager.onGamepadDisconnectedObservable.add((gamepad, state) => [
             GamepadInput.gamepads.forEach(gm => {

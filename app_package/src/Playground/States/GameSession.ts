@@ -30,6 +30,7 @@ export class GameSession {
     }
 
     public start(gameDefinition: Nullable<GameDefinition>): void {
+        console.log("[GameSession] start() called with:", gameDefinition);
         this._game = new Game(this._assets, this._scene, this._canvas, gameDefinition, this._glowLayer);
     }
 

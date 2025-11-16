@@ -8,7 +8,24 @@ module.exports = {
     mode: "development",
     devServer: {
         open: true,
-        watchFiles: ["./src/**/*", "../app_package/lib/**/*"]
+        watchFiles: ["./src/**/*", "../app_package/lib/**/*"],
+        port: 8081,
+        headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        },
+        static: {
+            directory: path.resolve(__dirname, "../docs"),
+            serveIndex: true
+        },
+        historyApiFallback: true,
+        client: {
+            overlay: true
+        },
+        devMiddleware: {
+            writeToDisk: true
+        }
     },
     output: {
         path: path.resolve(__dirname, "../docs"),

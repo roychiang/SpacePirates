@@ -72,6 +72,12 @@ export class Game
             gameDefinition.aiAllies = Parameters.allyCount;
             console.log("Using default game definition");
         }
+        console.log("[Game] Starting with:", {
+            humanAllies: gameDefinition.humanAllies,
+            humanEnemies: gameDefinition.humanEnemies,
+            aiAllies: gameDefinition.aiAllies,
+            aiEnemies: gameDefinition.aiEnemies
+        });
 
         const MaxShips = gameDefinition.humanAllies + gameDefinition.humanEnemies + gameDefinition.aiEnemies + gameDefinition.aiAllies;
         this._shotManager = new ShotManager(assets, scene, glowLayer);
@@ -93,6 +99,11 @@ export class Game
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
                 ship.shipCamera = camera
+                // Assign control index for this human ship
+                ship.controlIndex = i;
+                // Ensure an input slot exists for this player index
+                InputManager.getOrCreateInput(i);
+                console.log('[Game] Ally ship spawned with controlIndex', i);
                 this.humanPlayerShips.push(ship);
                 this.activeCameras.push(camera.getFreeCamera());
             }
@@ -106,6 +117,11 @@ export class Game
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
                 ship.shipCamera = camera;
+                // Assign control index for enemy human ships after allies indices
+                ship.controlIndex = gameDefinition.humanAllies + i;
+                // Ensure an input slot exists for this player index
+                InputManager.getOrCreateInput(ship.controlIndex);
+                console.log('[Game] Enemy ship spawned with controlIndex', ship.controlIndex);
                 this.humanPlayerShips.push(ship);
                 this.activeCameras.push(camera.getFreeCamera());
             }
@@ -113,16 +129,32 @@ export class Game
 
         this._cameraDummy = new FreeCamera("camera1", new Vector3(0, 0, 0), scene);
         this._cameraDummy.layerMask = 0x10000000;
-        this.activeCameras.push(this._cameraDummy);
+        // Do NOT include the dummy GUI camera in active player cameras
+        // to prevent its viewport from being set like a player split.
         
-        // Cameras
-        const divCamera = 1 / (this.activeCameras.length - 1);
-        for(let i = 0; i < (this.activeCameras.length - 1); i ++) {
-            const camera = this.activeCameras[i];
+        // Cameras: split-screen based on input devices (keyboard + gamepads)
+        // Keep at least 1 camera, cap to available ship cameras
+        const requestedCamCount = Math.max(1, 1 + GamepadInput.gamepads.length);
+        const shipCameras = this.activeCameras;
+        const playerCamCount = Math.min(requestedCamCount, shipCameras.length);
+        const playerCameras = shipCameras.slice(0, playerCamCount);
+        const divCamera = 1 / playerCamCount;
+        for(let i = 0; i < playerCamCount; i ++) {
+            const camera = playerCameras[i];
             camera.viewport.x = i * divCamera;
             camera.viewport.width = divCamera;
         }
-        scene.activeCameras = this.activeCameras;
+        // Ensure the dummy GUI camera renders over the full screen,
+        // independent of player split viewports
+        this._cameraDummy.viewport.x = 0;
+        this._cameraDummy.viewport.width = 1;
+        scene.activeCameras = [...playerCameras, this._cameraDummy];
+        console.log("[Game] Cameras configured:", {
+            playerCameras: playerCamCount,
+            humanShips: this.humanPlayerShips.length,
+            viewports: playerCameras.map(c => ({ x: c.viewport.x, width: c.viewport.width })),
+            dummyViewport: { x: this._cameraDummy.viewport.x, width: this._cameraDummy.viewport.width }
+        });
         if (this.humanPlayerShips.length) {
             this._world.ship = this.humanPlayerShips[0];
         }
@@ -164,7 +196,7 @@ export class Game
                 canShoot = true;
                 shootFrame = 130; // can shoot only every 130 ms
             }
-            this._shipManager.tick(canShoot, InputManager.input, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed);
+            this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed);
             
             this.humanPlayerShips.forEach((ship) => {
                 if (ship && ship.shipCamera) {

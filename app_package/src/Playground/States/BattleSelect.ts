@@ -65,7 +65,33 @@ export class BattleSelect extends State {
                     splashText.text = scenario.description;
                 });
                 button.onPointerDownObservable.add(() => {
-                    GameState.gameDefinition = scenario.gameDefinition;
+                    const base: GameDefinition = scenario.gameDefinition as GameDefinition;
+                    const override: Nullable<GameDefinition> = BattleSelect.gameDefinition;
+                    const finalDef: GameDefinition = {
+                        ...base,
+                        humanAllies: override?.humanAllies ?? base.humanAllies,
+                        humanEnemies: override?.humanEnemies ?? base.humanEnemies,
+                        aiAllies: base.aiAllies,
+                        aiEnemies: base.aiEnemies,
+                        seed: base.seed,
+                        asteroidCount: base.asteroidCount,
+                        asteroidRadius: base.asteroidRadius,
+                        humanAlliesLife: base.humanAlliesLife,
+                        humanEnemiesLife: base.humanEnemiesLife,
+                        aiAlliesLife: base.aiAlliesLife,
+                        aiEnemiesLife: base.aiEnemiesLife,
+                        shotDamage: base.shotDamage,
+                        missileDamage: base.missileDamage,
+                        delayedEnd: base.delayedEnd,
+                        enemyBoundaryRadius: base.enemyBoundaryRadius,
+                        humanBoundaryRadius: base.humanBoundaryRadius,
+                    };
+                    GameState.gameDefinition = finalDef;
+                    console.log("[BattleSelect] Mission selected:", scenario.name,
+                        "base.humanAllies=", base?.humanAllies,
+                        "override.humanAllies=", override?.humanAllies,
+                        "final.humanAllies=", finalDef.humanAllies,
+                        "final.humanEnemies=", finalDef.humanEnemies);
                     State.setCurrent(States.gameState);
                 })
             });
@@ -107,7 +133,33 @@ export class BattleSelect extends State {
                     splashText.text = scenario.description;
                 });
                 button.onPointerDownObservable.add(() => {
-                    GameState.gameDefinition = scenario.gameDefinition;
+                    const base: GameDefinition = scenario.gameDefinition as GameDefinition;
+                    const override: Nullable<GameDefinition> = BattleSelect.gameDefinition;
+                    const finalDef: GameDefinition = {
+                        ...base,
+                        humanAllies: override?.humanAllies ?? base.humanAllies,
+                        humanEnemies: override?.humanEnemies ?? base.humanEnemies,
+                        aiAllies: base.aiAllies,
+                        aiEnemies: base.aiEnemies,
+                        seed: base.seed,
+                        asteroidCount: base.asteroidCount,
+                        asteroidRadius: base.asteroidRadius,
+                        humanAlliesLife: base.humanAlliesLife,
+                        humanEnemiesLife: base.humanEnemiesLife,
+                        aiAlliesLife: base.aiAlliesLife,
+                        aiEnemiesLife: base.aiEnemiesLife,
+                        shotDamage: base.shotDamage,
+                        missileDamage: base.missileDamage,
+                        delayedEnd: base.delayedEnd,
+                        enemyBoundaryRadius: base.enemyBoundaryRadius,
+                        humanBoundaryRadius: base.humanBoundaryRadius,
+                    };
+                    GameState.gameDefinition = finalDef;
+                    console.log("[BattleSelect] Mission selected (portrait):", scenario.name,
+                        "base.humanAllies=", base?.humanAllies,
+                        "override.humanAllies=", override?.humanAllies,
+                        "final.humanAllies=", finalDef.humanAllies,
+                        "final.humanEnemies=", finalDef.humanEnemies);
                     State.setCurrent(States.gameState);
                 })
             });

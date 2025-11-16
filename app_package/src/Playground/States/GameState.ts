@@ -19,8 +19,10 @@ export class GameState extends State {
         Main.diorama?.setEnable(null);
 
         if (!GameState.gameSession?.inProgress()) {
+            console.log("[GameState] Starting new session with gameDefinition:", GameState.gameDefinition);
             GameState.gameSession?.start(GameState.gameDefinition);
         } else {
+            console.log("[GameState] Resuming session");
             GameState.gameSession?.resume();
         }
     }

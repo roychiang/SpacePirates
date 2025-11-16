@@ -52,9 +52,11 @@ export class Main extends State {
 
             Main.playButton.onPointerDownObservable.add(function(info) {
                 const gameDefinition = new GameDefinition();
-                gameDefinition.humanAllies = 1;
+                // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
+                gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
                 gameDefinition.aiEnemies = Parameters.enemyCount;
                 gameDefinition.aiAllies = Parameters.allyCount;
+                console.log("[Main] Play clicked. allowSplitScreen=", Parameters.allowSplitScreen, "humanAllies=", gameDefinition.humanAllies, "aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                 BattleSelect.gameDefinition = gameDefinition;
                 State.setCurrent(States.battleSelect);
             });
@@ -65,6 +67,7 @@ export class Main extends State {
                     gameDefinition.humanAllies = 2;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
                     gameDefinition.aiAllies = Parameters.allyCount;
+                    console.log("[Main] 2P Co-op selected. humanAllies=2 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                     BattleSelect.gameDefinition = gameDefinition;
                     State.setCurrent(States.battleSelect);
                 });
@@ -75,6 +78,7 @@ export class Main extends State {
                     gameDefinition.humanEnemies = 1;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
                     gameDefinition.aiAllies = Parameters.allyCount;
+                    console.log("[Main] 2P Vs selected. humanAllies=1 humanEnemies=1 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                     BattleSelect.gameDefinition = gameDefinition;
                     State.setCurrent(States.battleSelect);
                 });
@@ -110,9 +114,11 @@ export class Main extends State {
 
             Main.playButton.onPointerDownObservable.add(function(info) {
                 const gameDefinition = new GameDefinition();
-                gameDefinition.humanAllies = 1;
+                // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
+                gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
                 gameDefinition.aiEnemies = Parameters.enemyCount;
                 gameDefinition.aiAllies = Parameters.allyCount;
+                console.log("[Main] Play clicked (portrait). allowSplitScreen=", Parameters.allowSplitScreen, "humanAllies=", gameDefinition.humanAllies, "aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                 BattleSelect.gameDefinition = gameDefinition;
                 State.setCurrent(States.battleSelect);
             });
@@ -123,6 +129,7 @@ export class Main extends State {
                     gameDefinition.humanAllies = 2;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
                     gameDefinition.aiAllies = Parameters.allyCount;
+                    console.log("[Main] 2P Co-op selected (portrait). humanAllies=2 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                     BattleSelect.gameDefinition = gameDefinition;
                     State.setCurrent(States.battleSelect);
                 });
@@ -133,6 +140,7 @@ export class Main extends State {
                     gameDefinition.humanEnemies = 1;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
                     gameDefinition.aiAllies = Parameters.allyCount;
+                    console.log("[Main] 2P Vs selected (portrait). humanAllies=1 humanEnemies=1 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                     BattleSelect.gameDefinition = gameDefinition;
                     State.setCurrent(States.battleSelect);
                 });

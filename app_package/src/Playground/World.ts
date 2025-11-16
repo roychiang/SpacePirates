@@ -127,21 +127,23 @@ export class World {
             this._asteroids.push(new Asteroid(assets, scene, gameDefinition.asteroidRadius));
         }
 
-        this._renderObserver = scene.onBeforeRenderObservable.add( () => {
-            const camera = (scene.activeCameras?.length && scene.activeCameras[0]) ? scene.activeCameras[0]: scene.activeCamera;
-            if (camera) {
-                const referencePosition = camera.position;
-                if (referencePosition) {
-                    if (this.ship && this._starfield) {
-                        this._starfield.position.copyFrom(referencePosition);
-                    }
-                    if (this._planet && /*this._sun &&*/ this.ship) {
-                        this._planet.position.copyFrom(referencePosition);
-                        this._planet.position.z += 2500;
+        this._renderObserver = scene.onBeforeRenderObservable.add(() => {
+            // In multi-camera rendering, Babylon sets scene.activeCamera to
+            // the camera currently being rendered for this frame.
+            // Use that camera so each split viewport gets correct background.
+            const currentCamera = scene.activeCamera;
+            if (!currentCamera) return;
+            const referencePosition = currentCamera.position;
+            if (!referencePosition) return;
 
-                        World.updateSunPostProcess(referencePosition, this.sun.mesh);
-                    }
-                }
+            if (this.ship && this._starfield) {
+                this._starfield.position.copyFrom(referencePosition);
+            }
+            if (this._planet && /*this._sun &&*/ this.ship) {
+                this._planet.position.copyFrom(referencePosition);
+                this._planet.position.z += 2500;
+
+                World.updateSunPostProcess(referencePosition, this.sun.mesh);
             }
         });
     }

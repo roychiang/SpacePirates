@@ -185,8 +185,11 @@ class HUDPanel {
         let targetIndex = 0;
         shipManager.ships.forEach((ship) => {
             if (ship.isValid() && ship != player && ship.faction != player.faction) {
-                this._computeScreenCoord(engine, player.shipCamera!.getFreeCamera(), ship.root.position, this._targets[targetIndex]);
-                targetIndex++;
+                if (targetIndex < this._targets.length) {
+                    const img = this._targets[targetIndex];
+                    this._computeScreenCoord(engine, player.shipCamera!.getFreeCamera(), ship.root.position, img);
+                    targetIndex++;
+                }
             }
         });
 
@@ -231,7 +234,10 @@ class HUDPanel {
     }
 
     
-    private _computeScreenCoord(engine: Engine, camera: Camera, position: Vector3, image: Image, centerInterpolate: number = 1): void {
+    private _computeScreenCoord(engine: Engine, camera: Camera, position: Vector3, image: Image | undefined, centerInterpolate: number = 1): void {
+        if (!image) {
+            return;
+        }
         const w = (engine.getRenderWidth() * 0.5);
         const h = engine.getRenderHeight() * 0.5;
 

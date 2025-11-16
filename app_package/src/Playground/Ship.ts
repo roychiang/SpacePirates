@@ -91,6 +91,8 @@ export class Statistics {
 
 export class Ship extends Agent {
     public missileCooldown: number = 0;
+    // Index of player input controlling this ship (0-based). Defaults to 0.
+    public controlIndex: number = 0;
     roll: number = 0;
     root: TransformNode;
     velocity: number = 0;
@@ -500,7 +502,7 @@ export class ShipManager {
         return count;
     }
  
-    public tick(canShoot: boolean, humanInputs: Input, deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number): void {
+    public tick(canShoot: boolean, humanInputs: Input[], deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number): void {
         if (gameSpeed <= 0.001) {
             return;
         }
@@ -523,7 +525,7 @@ export class ShipManager {
             if (!ship.isValid()) {
                 continue;
             }
-            const input = ship.isHuman ? humanInputs : ship.input;
+            const input = ship.isHuman ? (humanInputs[ship.controlIndex] || humanInputs[0]) : ship.input;
 
             ship.statistics?.addTimeOfBattle(deltaTime);
 
