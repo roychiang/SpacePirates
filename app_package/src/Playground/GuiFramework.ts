@@ -1,4 +1,4 @@
-import { Engine, Vector2 } from "@babylonjs/core";
+import { Engine, Vector2, Scene } from "@babylonjs/core";
 import { Control, Button, Grid, StackPanel, Image, CornerHandle, AdvancedDynamicTexture, TextBlock, Rectangle, Slider, Checkbox, RadioButton, Ellipse } from "@babylonjs/gui";
 import { Assets } from "./Assets";
 
@@ -16,6 +16,9 @@ export class GuiFramework {
     public static screenRatio : number;
     public static ratioBreakPoint : number = 1.4;
     public static currentAdt : AdvancedDynamicTexture;
+    public static globalOverlayAdt?: AdvancedDynamicTexture;
+    public static cachedName?: string;
+    public static cachedUrl?: string;
 
     public static updateGuiBasedOnOrientation(adt: AdvancedDynamicTexture) {
         let controls: any = adt.getDescendants(false);
@@ -86,12 +89,21 @@ export class GuiFramework {
         // adt.addControl(portraitWarning);
     }
 
-    public static ensureGlobalTopLeftAvatar(adt: AdvancedDynamicTexture) {
-        const existing = adt.getControlByName("globalAvatarGrid")
-        if (!existing) {
-            this.createTopLeftAvatar(adt)
+    public static ensureGlobalOverlay(scene: Scene) {
+        if (!this.globalOverlayAdt) {
+            this.globalOverlayAdt = AdvancedDynamicTexture.CreateFullscreenUI("GlobalOverlay", true, scene);
+            this.globalOverlayAdt.idealHeight = 1440;
         }
-        return adt.getControlByName("globalAvatarGrid") as Grid
+        return this.globalOverlayAdt;
+    }
+
+    public static ensureGlobalTopLeftAvatar(adt: AdvancedDynamicTexture) {
+        const targetAdt = this.globalOverlayAdt || adt
+        const existing = targetAdt.getControlByName("globalAvatarGrid")
+        if (!existing) {
+            this.createTopLeftAvatar(targetAdt)
+        }
+        return targetAdt.getControlByName("globalAvatarGrid") as Grid
     }
 
     public static createTopLeftAvatar(adt: AdvancedDynamicTexture) {
@@ -150,11 +162,16 @@ export class GuiFramework {
         name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
         grid.addControl(name, 0, 1)
         adt.addControl(grid)
+        if (this.cachedName || this.cachedUrl) {
+            this.updateTopLeftAvatar(this.cachedName || "", this.cachedUrl || "")
+        }
         return grid
     }
 
     public static updateTopLeftAvatar(name?: string, url?: string) {
-        const adt = this.currentAdt
+        this.cachedName = name
+        this.cachedUrl = url
+        const adt = this.globalOverlayAdt || this.currentAdt
         if (!adt) return
         const nameCtrl = adt.getControlByName("globalAvatarName") as TextBlock
         const img = adt.getControlByName("globalAvatarImage") as Image
@@ -163,10 +180,11 @@ export class GuiFramework {
         if (nameCtrl && name) nameCtrl.text = name
         if (img && url && url.length > 0) {
             img.source = url
+            img.alpha = 1
             if (bg) bg.alpha = 0
             if (q) q.alpha = 0
         } else {
-            if (img) img.source = ""
+            if (img) img.alpha = 0
             if (bg) bg.alpha = 1
             if (q) q.alpha = 1
         }

@@ -15,6 +15,7 @@ import { SparksEffects } from "./FX/SparksEffect";
 import { GamepadInput } from "./Inputs/GamepadInput";
 import { TrailManager } from "./FX/Trail";
 import { World } from "./World";
+import { playService } from "../Viverse/Viverse";
 
 export class GameDefinition {
     public humanAllies: number = 0;
@@ -196,6 +197,10 @@ export class Game
                 canShoot = true;
                 shootFrame = 130; // can shoot only every 130 ms
             }
+            try {
+                const local = InputManager.getOrCreateInput(0);
+                playService.broadcastInput({ index: 0, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.breaking, launchMissile: local.launchMissile, immelmann: local.immelmann });
+            } catch {}
             this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed);
             
             this.humanPlayerShips.forEach((ship) => {
@@ -222,6 +227,22 @@ export class Game
             // victory check
             this._checkVictory(scene.getEngine().getDeltaTime() / 1000);
         });
+
+        try {
+            playService.on("remoteInput", (p: any) => {
+                if (!p) return;
+                const idx = typeof p.index === 'number' ? p.index : 1;
+                const target = InputManager.getOrCreateInput(idx);
+                target.dx = p.dx || 0;
+                target.dy = p.dy || 0;
+                target.shooting = !!p.shooting;
+                target.burst = !!p.burst;
+                target.breaking = !!p.breaking;
+                target.launchMissile = !!p.launchMissile;
+                target.immelmann = !!p.immelmann;
+                target.constrainInput();
+            })
+        } catch {}
 
         /* inspector
         this._hotkeyObservable = scene.onKeyboardObservable.add((kbInfo) => {

@@ -101,6 +101,7 @@ export async function initializeBabylonApp(options: InitializeBabylonAppOptions)
     (window as any).engine = engine;
 
     const scene = CreatePlaygroundScene(engine, options.assetsHostUrl!, canvas);
+    GuiFramework.ensureGlobalOverlay(scene)
     console.log("[App] scene created")
     GuiFramework.updateScreenRatio(engine);
     engine.runRenderLoop(() => {

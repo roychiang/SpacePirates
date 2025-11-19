@@ -44,6 +44,11 @@ export class State {
         if (this._adt) {
             GuiFramework.setOrientation(this._adt)
             GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
+            if (avatarService && (avatarService as any).profile) {
+                const p = (avatarService as any).profile
+                const url = avatarService.getHeadIconUrlOrDefault(p)
+                GuiFramework.updateTopLeftAvatar(p?.name, url)
+            }
             ;(async () => {
                 authService.initClient({ clientId: "v48pybqy7f", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
                 const attempt = async () => {
@@ -58,14 +63,16 @@ export class State {
                     const t0 = performance.now()
                     const name = await authService.getDisplayName(token)
                     const profile = await avatarService.getProfile()
+                    ;(avatarService as any).profile = profile
                     const url = avatarService.getHeadIconUrlOrDefault(profile)
                     const t1 = performance.now()
                     console.log("[Avatar] name", name, "url", url, "ts", new Date().toISOString(), "ms", Math.round(t1 - t0))
                     GuiFramework.updateTopLeftAvatar(name, url)
                     if (!token) {
                         try {
-                            window.parent?.postMessage({ method: "initialize-auth" }, "*")
-                            console.log("[Auth] initialize-auth posted to parent")
+                            const parentOrigin = (document.referrer && document.referrer.startsWith("http")) ? new URL(document.referrer).origin : "*"
+                            window.parent?.postMessage({ method: "initialize-auth" }, parentOrigin)
+                            console.log("[Auth] initialize-auth posted to parent", parentOrigin)
                         } catch {}
                     }
                 }

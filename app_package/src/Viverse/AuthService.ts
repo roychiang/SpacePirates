@@ -148,6 +148,24 @@ export class AuthService {
     return this.guestName
   }
 
+  async getAccountId(): Promise<string | undefined> {
+    if (this.accountId) return this.accountId
+    const info = await this.checkAuth()
+    if (info && info.account_id) {
+      this.accountId = info.account_id
+      return this.accountId
+    }
+    try {
+      const stored = window.localStorage.getItem("sp_session_id")
+      if (stored) return stored
+      const rand = Math.random().toString(36).slice(2)
+      window.localStorage.setItem("sp_session_id", rand)
+      return rand
+    } catch {
+      return Math.random().toString(36).slice(2)
+    }
+  }
+
   async isGuest(): Promise<boolean> {
     return true
   }
