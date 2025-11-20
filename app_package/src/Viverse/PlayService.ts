@@ -70,7 +70,7 @@ export class PlayService {
               this.emit("roomListUpdated", { rooms })
             })
             this.client.on("onRoomActorChange", async (payload: any) => {
-              try { console.log("[Play] onRoomActorChange", payload) } catch {}
+              try { console.log("[Play] onRoomActorChange", payload) } catch { }
               try {
                 if (Array.isArray(payload) || (payload && Array.isArray(payload.actors))) {
                   const incoming: Actor[] = Array.isArray(payload) ? (payload as Actor[]) : (payload.actors as Actor[])
@@ -143,8 +143,8 @@ export class PlayService {
   async setReady(ready: boolean): Promise<{ success: boolean }> {
     if (!this.actor) return { success: false }
     try {
-      this.actor.properties = { ...(this.actor.properties || {}), ready: ready ? 1 : 0 }
-      try { console.log("[Play] setReady", { session_id: this.actor.session_id, ready }) } catch {}
+      this.actor.properties = { ...(this.actor.properties || {}), player_ready: ready ? "1" : "0" }
+      try { console.log("[Play] setReady", { session_id: this.actor.session_id, ready }) } catch { }
       if (this.client && typeof this.client.setActor === "function") {
         await this.waitConnected()
         await this.client.setActor(this.actor)
@@ -153,7 +153,7 @@ export class PlayService {
         const idx = this.room.actors.findIndex(a => a.session_id === this.actor!.session_id)
         if (idx >= 0) {
           const a = this.room.actors[idx]
-          this.room.actors[idx] = { ...a, properties: { ...(a.properties || {}), ready: ready ? 1 : 0 } }
+          this.room.actors[idx] = { ...a, properties: { ...(a.properties || {}), player_ready: ready ? "1" : "0" } }
         } else {
           this.room.actors = (this.room.actors || []).concat([this.actor])
         }
@@ -236,6 +236,31 @@ export class PlayService {
     this.room = room
     this.emit("roomUpdated", room)
     return { success: true, room }
+  }
+
+  async updateRoomProperties(props: Record<string, any>): Promise<{ success: boolean; message?: string }> {
+    if (this.client && typeof this.client.updateRoom === "function" && this.room) {
+      try {
+        await this.waitConnected()
+        const payload = { id: this.room.id, properties: { ...(this.room.properties || {}), ...props } }
+        console.log("[Play] updateRoomProperties", payload)
+        const res = await this.client.updateRoom(payload)
+        console.log("[Play] updateRoomProperties result", res)
+        this.room = res?.room || this.room
+        this.emit("roomUpdated", this.room)
+        return { success: !!res?.room, message: res?.message }
+      } catch (e) {
+        console.log("[Play] updateRoomProperties error", e)
+        return { success: false, message: String(e) }
+      }
+    }
+    // Fallback for local testing or if client not available
+    if (this.room) {
+      this.room.properties = { ...(this.room.properties || {}), ...props }
+      this.emit("roomUpdated", this.room)
+      return { success: true }
+    }
+    return { success: false, message: "no room" }
   }
 
   async joinRoom(roomId: string): Promise<JoinRoomResult> {
@@ -407,7 +432,7 @@ export class PlayService {
         console.log("[Play] getAvailableRooms", { count: Array.isArray(res?.rooms) ? res.rooms.length : 0, ts, ms: Math.round(t1 - t0) })
         if (Array.isArray(res?.rooms)) {
           const list = (res.rooms || []) as Room[]
-          console.log("[Play] rooms detail", list.map((r: Room) => ({ id: r.id, name: r.name, mode: r.mode, max: r.max_players, min: r.min_players, closed: r.is_closed, actors: ((r.actors || []) as Actor[]).map((a: Actor) => ({ name: a.name, ready: !!a.properties?.["ready"] })) })))
+          console.log("[Play] rooms detail", list.map((r: Room) => ({ id: r.id, name: r.name, mode: r.mode, max: r.max_players, min: r.min_players, closed: r.is_closed, actors: ((r.actors || []) as Actor[]).map((a: Actor) => ({ name: a.name, ready: a.properties?.["player_ready"] === 1 || a.properties?.["player_ready"] === "1" })) })))
         }
         return { success: true, rooms: res?.rooms || [] }
       } catch (e) {
@@ -440,7 +465,7 @@ export class PlayService {
           const mergedProps = this.mergeProps(prevMatch?.properties, a.properties, isMe)
           return { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
         })
-        console.log("[Play] actors detail", alist.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["ready"]) })))
+        console.log("[Play] actors detail", alist.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
         // 合併 getAvailableRooms 中的我方房間資料，若其演員列表更完整或可補齊 ready
         if (this.client && typeof this.client.getAvailableRooms === "function" && this.room && this.room.id) {
           try {
@@ -448,24 +473,24 @@ export class PlayService {
             const my = Array.isArray(resRooms?.rooms) ? (resRooms.rooms as Room[]).find((r: Room) => r.id === this.room!.id) : undefined
             if (my && Array.isArray(my.actors)) {
               const repl = (my.actors as Actor[])
-              const hasMissingReady = (alist || []).some((a: Actor) => typeof (a.properties || {})["ready"] === "undefined")
+              const hasMissingReady = (alist || []).some((a: Actor) => typeof (a.properties || {})["player_ready"] === "undefined")
               const shouldMerge = repl.length >= alist.length || hasMissingReady
               if (shouldMerge) {
                 const prev2 = Array.isArray(this.room?.actors) ? (this.room!.actors as Actor[]) : []
                 const byId: Record<string, Actor> = {}
                 for (const p of (alist || [])) byId[p.session_id] = p
                 for (const a of (repl || [])) {
-                const prevMatch = byId[a.session_id] || prev2.find((p: Actor) => p.session_id === a.session_id)
-                const isMe = !!this.actor && a.session_id === this.actor!.session_id
-                const fromProps = (a as any)?.properties && typeof (a as any).properties["displayName"] === "string" ? String((a as any).properties["displayName"]) : ""
-                const name = (isMe && this.actor!.name) || (a.name && String(a.name)) || fromProps || (prevMatch ? (prevMatch as Actor).name : "")
-                const mergedProps = this.mergeProps((prevMatch as any)?.properties, a.properties, isMe)
-                byId[a.session_id] = { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
-              }
+                  const prevMatch = byId[a.session_id] || prev2.find((p: Actor) => p.session_id === a.session_id)
+                  const isMe = !!this.actor && a.session_id === this.actor!.session_id
+                  const fromProps = (a as any)?.properties && typeof (a as any).properties["displayName"] === "string" ? String((a as any).properties["displayName"]) : ""
+                  const name = (isMe && this.actor!.name) || (a.name && String(a.name)) || fromProps || (prevMatch ? (prevMatch as Actor).name : "")
+                  const mergedProps = this.mergeProps((prevMatch as any)?.properties, a.properties, isMe)
+                  byId[a.session_id] = { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
+                }
                 alist = Object.keys(byId).map(k => byId[k])
               }
             }
-          } catch {}
+          } catch { }
         }
         if (this.room) {
           this.room.actors = alist
@@ -480,7 +505,7 @@ export class PlayService {
       }
     }
     const actors = this.room ? this.room.actors : []
-    console.log("[Play] getMyRoomActors fallback", actors.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["ready"]) })))
+    console.log("[Play] getMyRoomActors fallback", actors.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
     return { success: true, actors }
   }
 
@@ -501,7 +526,7 @@ export class PlayService {
         this.room = { ...updated, actors: present ? ulist : ulist.concat([actor]) }
         this.emit("roomUpdated", this.room)
       }
-    } catch {}
+    } catch { }
   }
 
   on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot", handler: Handler) {
@@ -537,7 +562,7 @@ export class PlayService {
         this.actorsRefreshing = false
         this.emit("roomUpdated", this.room)
       }, 150)
-    } catch {}
+    } catch { }
   }
 
   private isReady(val: any): boolean {
@@ -548,10 +573,11 @@ export class PlayService {
     const p = prevProps || {}
     const n = newProps || {}
     const merged: Record<string, number | string> = { ...p, ...n }
-    const m = this.mergeReady(p["ready"], n["ready"]) as any
-    if (typeof m !== "undefined") merged["ready"] = m
+    const m = this.mergeReady(p["player_ready"], n["player_ready"]) as any
+    if (typeof m !== "undefined") merged["player_ready"] = m
     if (isMe && this.actor && this.actor.properties) {
-      if (typeof this.actor.properties["ready"] !== "undefined") merged["ready"] = this.actor.properties["ready"] as any
+      // Restore local override for Optimistic UI
+      if (typeof this.actor.properties["player_ready"] !== "undefined") merged["player_ready"] = this.actor.properties["player_ready"] as any
       if (typeof this.actor.properties["headIconUrl"] === "string") merged["headIconUrl"] = this.actor.properties["headIconUrl"] as any
       if (typeof (this.actor as any).properties["displayName"] === "string") merged["displayName"] = (this.actor as any).properties["displayName"] as any
     }
@@ -559,13 +585,22 @@ export class PlayService {
   }
 
   private mergeReady(prev: any, next: any): number | undefined {
-    const p = this.isReady(prev)
-    const n = this.isReady(next)
-    if (p || n) return 1
-    // 若兩者都非 ready，擇一為 waiting（0）或都未知則不設置
-    const p0 = (prev === 0 || prev === "0" || prev === false)
-    const n0 = (next === 0 || next === "0" || next === false)
-    if (p0 || n0) return 0
+    // Always prefer the new value from server (next) over cached value (prev)
+    // This ensures ready state can toggle from 1 -> 0 and 0 -> 1
+    if (typeof next !== 'undefined') {
+      const n = this.isReady(next)
+      const result = n ? 1 : 0
+      console.log(`[Play] mergeReady: prev=${prev}, next=${next} => ${result}`)
+      return result
+    }
+    // Only use prev if next is undefined
+    if (typeof prev !== 'undefined') {
+      const p = this.isReady(prev)
+      const result = p ? 1 : 0
+      console.log(`[Play] mergeReady: prev=${prev}, next=undefined => ${result}`)
+      return result
+    }
+    console.log(`[Play] mergeReady: prev=undefined, next=undefined => undefined`)
     return undefined
   }
 }

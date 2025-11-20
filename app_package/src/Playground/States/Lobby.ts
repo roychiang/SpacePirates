@@ -33,27 +33,24 @@ export class Lobby extends State {
     this.playersPanel = new StackPanel()
     content.addControl(this.playersPanel, 1, 1)
     const leaveBtn = GuiFramework.addButton("Leave Room", panel)
-    this.startBtn = GuiFramework.addButton("Ready", panel)
+    this.startBtn = GuiFramework.addButton("Start Game", panel)
+    this.startBtn.isVisible = false // Initially hidden, shown only for host when room is full
     leaveBtn.onPointerDownObservable.add(() => {
       playService.leaveRoom().then(() => {
         State.setCurrent(States.matchmaking)
       })
     })
     this.startBtn.onPointerDownObservable.add(async () => {
-      const res = await playService.getMyRoomActors()
-      const actors = res.actors || []
-      const me = (playService as any).getActor ? (playService as any).getActor() : undefined
-      const mine = me ? actors.find(a => a.session_id === me.session_id) : undefined
-      const current = !!(mine && mine.properties && mine.properties["ready"])
-      await playService.setReady(!current)
-      this.refresh()
+      // Host clicks Start Game - signal all players to start
+      await playService.updateRoomProperties({ game_started: true })
+      this.tryStart()
     })
     this._adt.addControl(root)
     playService.ensureActorPresentInRoom().then(() => this.refresh())
-    ;(playService as any).off?.("roomUpdated", this.onRoomUpdated)
-    ;(playService as any).off?.("actorJoined", this.onActorJoined)
-    ;(playService as any).off?.("actorLeft", this.onActorLeft)
-    ;(playService as any).off?.("readyStateChanged", this.onReadyChanged)
+      ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
+      ; (playService as any).off?.("actorJoined", this.onActorJoined)
+      ; (playService as any).off?.("actorLeft", this.onActorLeft)
+      ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
     playService.on("roomUpdated", this.onRoomUpdated)
     playService.on("actorJoined", this.onActorJoined)
     playService.on("actorLeft", this.onActorLeft)
@@ -64,7 +61,6 @@ export class Lobby extends State {
   private async refresh() {
     const res = await playService.getMyRoomActors()
     let actors = res.actors || []
-    console.log("[Lobby] actors detail", actors.map(a => { const v = a.properties?.["ready"] as any; return { name: a.name, ready: (v === 1 || v === "1" || v === true) } }))
     if (!this.playersPanel) return
     this.playersPanel.clearControls()
     const room = playService.getRoom()
@@ -76,6 +72,10 @@ export class Lobby extends State {
     if (me && (!actors.find(a => a.session_id === me.session_id))) {
       actors = (actors || []).concat([me])
     }
+
+    const minPlayers = room ? (room.min_players || 2) : 2
+    const isFull = actors.length >= minPlayers
+
     for (const a of actors) {
       const row = new Grid()
       row.addRowDefinition(60, true)
@@ -127,52 +127,38 @@ export class Lobby extends State {
       row.addControl(owner, 0, 2)
       const ready = new TextBlock()
       GuiFramework.setFont(ready, true, true)
-      const rVal = a.properties?.["ready"] as any
-      const rOn = (rVal === 1 || rVal === "1" || rVal === true)
-      ready.color = rOn ? "#2ecc71" : "#e74c3c"
+      // Auto-ready: if room is full, show Ready, otherwise Waiting
+      ready.color = isFull ? "#2ecc71" : "#e74c3c"
       ready.fontSize = 18
-      ready.text = rOn ? "Ready" : "Waiting"
+      ready.text = isFull ? "Ready" : "Waiting"
       ready.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
-      if (me && a.session_id === me.session_id) {
-        ready.onPointerDownObservable.add(async () => {
-          const v = a.properties["ready"] as any
-          const current = (v === 1 || v === "1" || v === true)
-          await playService.setReady(!current)
-          this.refresh()
-        })
-      }
-      
+      // No click handler - ready state is automatic
+
       row.addControl(ready, 0, 3)
       this.playersPanel.addControl(row)
     }
     const isOwner = !!me && !!ownerId && me.session_id === ownerId
-    const minPlayers = room ? (room.min_players || 2) : 2
-    const enoughPlayers = actors.length >= minPlayers
-    const allReady = actors.length > 0 && actors.every(a => { const v = a.properties?.["ready"] as any; return v === 1 || v === "1" || v === true })
-    const iAmReady = !!me && !!actors.find(a => { const v = a.properties?.["ready"] as any; return a.session_id === me!.session_id && (v === 1 || v === "1" || v === true) })
+
+    // Show Start Game button only for host when room is full
     if (this.startBtn) {
-      this.startBtn.isEnabled = !!me && !iAmReady
-      this.startBtn.isVisible = !!me && !iAmReady
+      this.startBtn.isVisible = isOwner && isFull
+      this.startBtn.isEnabled = isOwner && isFull
     }
-    if (isOwner && enoughPlayers && allReady) {
-      if (!this.startTimer) {
-        this.startTimer = window.setTimeout(() => {
-          this.tryStart()
-          this.startTimer = undefined
-        }, 3000)
-      }
-    } else {
-      if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
+
+    // Check if game has been started via room properties
+    if (room && room.properties && room.properties.game_started === true) {
+      console.log("[Lobby] Game started detected, transitioning to game")
+      this.tryStart()
     }
   }
 
   public exit() {
     super.exit()
     if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
-    ;(playService as any).off?.("roomUpdated", this.onRoomUpdated)
-    ;(playService as any).off?.("actorJoined", this.onActorJoined)
-    ;(playService as any).off?.("actorLeft", this.onActorLeft)
-    ;(playService as any).off?.("readyStateChanged", this.onReadyChanged)
+    ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
+      ; (playService as any).off?.("actorJoined", this.onActorJoined)
+      ; (playService as any).off?.("actorLeft", this.onActorLeft)
+      ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
   }
 
   private async loadStatus() {
