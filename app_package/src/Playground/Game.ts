@@ -36,8 +36,7 @@ export class GameDefinition {
     public humanBoundaryRadius: number = 800;
 }
 
-export class Game
-{
+export class Game {
     private _shipManager: ShipManager;
     private _missileManager: MissileManager;
     private _shotManager: ShotManager;
@@ -59,9 +58,11 @@ export class Game
     private _delayedEnd: number;
     //private _glowLayer: GlowLayer;
 
-    constructor(assets: Assets, scene: Scene, canvas: HTMLCanvasElement, gameDefinition: Nullable<GameDefinition>, glowLayer: GlowLayer)
-    {
+    private _localPlayerIndex: number = 0;
+
+    constructor(assets: Assets, scene: Scene, canvas: HTMLCanvasElement, gameDefinition: Nullable<GameDefinition>, glowLayer: GlowLayer, localPlayerIndex: number = 0) {
         this._scene = scene;
+        this._localPlayerIndex = localPlayerIndex;
 
         var shootFrame = 0;
 
@@ -77,7 +78,8 @@ export class Game
             humanAllies: gameDefinition.humanAllies,
             humanEnemies: gameDefinition.humanEnemies,
             aiAllies: gameDefinition.aiAllies,
-            aiEnemies: gameDefinition.aiEnemies
+            aiEnemies: gameDefinition.aiEnemies,
+            localPlayerIndex: this._localPlayerIndex
         });
 
         const MaxShips = gameDefinition.humanAllies + gameDefinition.humanEnemies + gameDefinition.aiEnemies + gameDefinition.aiAllies;
@@ -94,8 +96,7 @@ export class Game
         }
 
         this.activeCameras = [];
-        for (let i = 0; i < gameDefinition.humanAllies; i++)
-        {
+        for (let i = 0; i < gameDefinition.humanAllies; i++) {
             const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, 0);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
@@ -112,8 +113,7 @@ export class Game
 
         this._world = new World(assets, scene, gameDefinition, this.activeCameras[0], glowLayer);
 
-        for (let i = 0; i < gameDefinition.humanEnemies; i++)
-        {
+        for (let i = 0; i < gameDefinition.humanEnemies; i++) {
             const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, 500), Quaternion.FromEulerAngles(0, Math.PI, 0), true, 1);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
@@ -132,7 +132,7 @@ export class Game
         this._cameraDummy.layerMask = 0x10000000;
         // Do NOT include the dummy GUI camera in active player cameras
         // to prevent its viewport from being set like a player split.
-        
+
         // Cameras: split-screen based on input devices (keyboard + gamepads)
         // Keep at least 1 camera, cap to available ship cameras
         const requestedCamCount = Math.max(1, 1 + GamepadInput.gamepads.length);
@@ -140,7 +140,7 @@ export class Game
         const playerCamCount = Math.min(requestedCamCount, shipCameras.length);
         const playerCameras = shipCameras.slice(0, playerCamCount);
         const divCamera = 1 / playerCamCount;
-        for(let i = 0; i < playerCamCount; i ++) {
+        for (let i = 0; i < playerCamCount; i++) {
             const camera = playerCameras[i];
             camera.viewport.x = i * divCamera;
             camera.viewport.width = divCamera;
@@ -160,19 +160,76 @@ export class Game
             this._world.ship = this.humanPlayerShips[0];
         }
 
-        for (let i = 1; i <= gameDefinition.aiAllies; i++)
-        {
-            this._shipManager.spawnShip(
-                new Vector3(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50 - 500), 
-                Quaternion.FromEulerAngles(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2),
-                false, 0);
+        // Spawn AI from Room Properties Config
+        const room = playService.getRoom();
+        let aiConfig: any[] = [];
+        if (room && room.properties && room.properties.ai_config) {
+            try {
+                aiConfig = JSON.parse(room.properties.ai_config);
+                console.log("[Game] Loaded AI config:", aiConfig);
+            } catch (e) {
+                console.error("[Game] Failed to parse AI config", e);
+            }
         }
 
-        for (let i = 1; i <= gameDefinition.aiEnemies; i++) {
-            this._shipManager.spawnShip(
-                new Vector3(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50 + 500), 
-                Quaternion.FromEulerAngles(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2),
-                false, 1);
+        if (aiConfig.length > 0) {
+            aiConfig.forEach(cfg => {
+                const pos = new Vector3(cfg.pos.x, cfg.pos.y, cfg.pos.z);
+                const rot = new Quaternion(cfg.rot.x, cfg.rot.y, cfg.rot.z, cfg.rot.w || 1.0); // Ensure w exists if using Euler, but here we saved Euler in Lobby? Wait, Lobby saved Euler?
+                // Lobby saved: rot: { x: rand, y: rand, z: rand } (Euler)
+                // But Game.ts used Quaternion.FromEulerAngles.
+                // Let's check Lobby again.
+                // Lobby: rot: { x: Math.random() * Math.PI * 2 ... }
+                // So these are Euler angles.
+                const quat = Quaternion.FromEulerAngles(cfg.rot.x, cfg.rot.y, cfg.rot.z);
+                this._shipManager.spawnShip(pos, quat, false, cfg.type);
+            });
+        } else {
+            // Fallback if no config (e.g. single player or error)
+            console.log("[Game] No AI config found, using random spawn");
+            for (let i = 1; i <= gameDefinition.aiAllies; i++) {
+                this._shipManager.spawnShip(
+                    new Vector3(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50 - 500),
+                    Quaternion.FromEulerAngles(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2),
+                    false, 0);
+            }
+            for (let i = 1; i <= gameDefinition.aiEnemies; i++) {
+                this._shipManager.spawnShip(
+                    new Vector3(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50 + 500),
+                    Quaternion.FromEulerAngles(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2),
+                    false, 1);
+            }
+        }
+
+        if (this._localPlayerIndex !== 0) {
+            // Client listens for dynamic spawns (if any future ones)
+            playService.on("spawnEnemy", (p: any) => {
+                if (!p) return;
+                const pos = new Vector3(p.position.x, p.position.y, p.position.z);
+                const rot = new Quaternion(p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
+                this._shipManager.spawnShip(pos, rot, false, p.type);
+            });
+
+            // Client listens for game end
+            playService.on("gameEnd", (p: any) => {
+                if (p && p.result === "victory") {
+                    States.victory.ship = this.humanPlayerShips[0]; // Just use local player for camera focus
+                    if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
+                    State.setCurrent(States.victory);
+                } else if (p && p.result === "defeat") {
+                    if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
+                    State.setCurrent(States.dead);
+                }
+            });
+
+            // Client listens for game state updates (ship lives)
+            playService.on("gameStateUpdate", (p: any) => {
+                if (p && p.ships && Array.isArray(p.ships)) {
+                    p.ships.forEach((s: any) => {
+                        this._shipManager.setShipState(s.index, s.life, s.position, s.rotation);
+                    });
+                }
+            });
         }
 
         // remove asteroids too close to ships
@@ -184,7 +241,8 @@ export class Game
         scene.freezeMaterials();
         //AbstractMesh.isInFrustum = function() { return true; };
 
-        this._renderObserver = scene.onBeforeRenderObservable.add( () => {
+        let gameStateTimer = 0;
+        this._renderObserver = scene.onBeforeRenderObservable.add(() => {
             this._speed += (this._targetSpeed - this._speed) * 0.1;
             const deltaTime = scene.getEngine().getDeltaTime() * this._speed;
             InputManager.deltaTime = deltaTime;
@@ -198,11 +256,33 @@ export class Game
                 shootFrame = 130; // can shoot only every 130 ms
             }
             try {
-                const local = InputManager.getOrCreateInput(0);
-                playService.broadcastInput({ index: 0, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.breaking, launchMissile: local.launchMissile, immelmann: local.immelmann });
-            } catch {}
-            this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed);
-            
+                const local = InputManager.getOrCreateInput(this._localPlayerIndex);
+                playService.broadcastInput({ index: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.breaking, launchMissile: local.launchMissile, immelmann: local.immelmann });
+            } catch { }
+
+            const isHost = this._localPlayerIndex === 0;
+            this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed, isHost);
+
+            // Host broadcasts game state periodically
+            if (isHost) {
+                gameStateTimer -= deltaTime;
+                if (gameStateTimer <= 0) {
+                    gameStateTimer = 200; // Broadcast every 200ms
+                    const shipsData = this._shipManager.ships.map((s, idx) => ({
+                        index: idx,
+                        life: s.life,
+                        // position: { x: s.root.position.x, y: s.root.position.y, z: s.root.position.z },
+                        // rotation: { x: s.root.rotationQuaternion?.x, y: s.root.rotationQuaternion?.y, z: s.root.rotationQuaternion?.z, w: s.root.rotationQuaternion?.w }
+                    }));
+                    playService.broadcastGameState({
+                        score: 0, // TODO: implement score
+                        lives: 0, // TODO: implement shared lives
+                        wave: 0,
+                        ships: shipsData
+                    } as any);
+                }
+            }
+
             this.humanPlayerShips.forEach((ship) => {
                 if (ship && ship.shipCamera) {
                     var wmat = ship.root.getWorldMatrix();
@@ -224,8 +304,10 @@ export class Game
                 this._trailManager.tick(deltaTime);
             }
 
-            // victory check
-            this._checkVictory(scene.getEngine().getDeltaTime() / 1000);
+            // victory check - Host Only
+            if (this._localPlayerIndex === 0) {
+                this._checkVictory(scene.getEngine().getDeltaTime() / 1000);
+            }
         });
 
         try {
@@ -242,7 +324,7 @@ export class Game
                 target.immelmann = !!p.immelmann;
                 target.constrainInput();
             })
-        } catch {}
+        } catch { }
 
         /* inspector
         this._hotkeyObservable = scene.onKeyboardObservable.add((kbInfo) => {
@@ -263,18 +345,18 @@ export class Game
         this._delayedEnd = gameDefinition.delayedEnd;
     }
 
-    public getShipManager() : ShipManager {
+    public getShipManager(): ShipManager {
         return this._shipManager;
     }
 
     public setTargetSpeed(speed: number): void {
         this._targetSpeed = speed;
     }
-/*
-    public getCamera(): Camera {
-        return this._camera;
-    }
-*/
+    /*
+        public getCamera(): Camera {
+            return this._camera;
+        }
+    */
     public getRecorder(): Nullable<Recorder> {
         return this._recorder;
     }
@@ -299,6 +381,7 @@ export class Game
                     this._HUD.dispose();
                     this._HUD = null;
                 }
+                playService.broadcastGameEnd({ result: "defeat" });
                 State.setCurrent(States.dead);
             }
             this._delayedEnd -= deltaTime;
@@ -310,15 +393,14 @@ export class Game
                     this._HUD.dispose();
                     this._HUD = null;
                 }
-
+                playService.broadcastGameEnd({ result: "victory" });
                 State.setCurrent(States.victory);
             }
             this._delayedEnd -= deltaTime;
         }
     }
 
-    dispose()
-    {
+    dispose() {
         this._shipManager.dispose();
         this._missileManager.dispose();
         this._shotManager.dispose();

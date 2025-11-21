@@ -16,7 +16,7 @@ export class Matchmaking extends State {
   private selectedRoomId?: string
   private listedRooms: any[] = []
   private joinBtn?: Button
-  private onConnected = async () => { await this.ensureActor(); this.refreshRooms() }
+  private onConnected = async () => { await this.ensureActor(); /* this.refreshRooms() removed to avoid overwriting event data */ }
   private onRoomListUpdated = (payload: any) => { const rooms = (payload && payload.rooms) ? payload.rooms : []; this.refreshRooms(rooms) }
 
   public enter() {
@@ -24,8 +24,8 @@ export class Matchmaking extends State {
     if (!this._adt) return
     authService.initClient({ clientId: "v48pybqy7f", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
     playService.newMatchmakingClient("v48pybqy7f", true).then(() => {
-      ;(playService as any).off?.("connected", this.onConnected)
-      ;(playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
+      ; (playService as any).off?.("connected", this.onConnected)
+        ; (playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
       playService.on("connected", this.onConnected)
       playService.on("roomListUpdated", this.onRoomListUpdated)
     })
@@ -69,7 +69,12 @@ export class Matchmaking extends State {
       const sessionId = await authService.getAccountId() || Math.random().toString(36).slice(2)
       console.log("[UI] create room start", { name, sessionId })
       await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
-      await playService.createRoom({ name, mode: "team", maxPlayers: 2, minPlayers: 2, properties: { owner: name } })
+      const res = await playService.createRoom({ name, mode: "team", maxPlayers: 2, minPlayers: 2, properties: { owner: name } })
+      if (!res.success) {
+        console.log("[UI] create room failed", res.message)
+        // TODO: Show error message to user
+        return
+      }
       await playService.ensureActorPresentInRoom()
       console.log("[UI] create room done")
       State.setCurrent(States.lobby)
@@ -88,7 +93,12 @@ export class Matchmaking extends State {
         console.log("[UI] join blocked: room full", { id: rid, count: target.actors.length })
         return
       }
-      await playService.joinRoom(rid || "room")
+      const res = await playService.joinRoom(rid || "room")
+      if (!res.success) {
+        console.log("[UI] join room failed", res.message)
+        // TODO: Show error message to user
+        return
+      }
       await playService.ensureActorPresentInRoom()
       State.setCurrent(States.lobby)
     })
@@ -97,7 +107,8 @@ export class Matchmaking extends State {
     })
     this._adt.addControl(root)
     this.loadStatus()
-    this.roomsTimer = window.setInterval(() => this.refreshRooms(), 2000)
+    // Removed polling timer - we get real-time updates from onRoomListUpdate event
+    // this.roomsTimer = window.setInterval(() => this.refreshRooms(), 2000)
   }
 
   private async loadStatus() {
@@ -119,11 +130,12 @@ export class Matchmaking extends State {
   public exit() {
     super.exit()
     if (this.roomsTimer) window.clearInterval(this.roomsTimer)
-    ;(playService as any).off?.("connected", this.onConnected)
-    ;(playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
+      ; (playService as any).off?.("connected", this.onConnected)
+      ; (playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
   }
 
   private async refreshRooms(roomsOverride?: any[]) {
+    console.log("[UI] refreshRooms called", { hasOverride: !!roomsOverride, count: roomsOverride ? roomsOverride.length : "undefined" })
     const res = roomsOverride ? { rooms: roomsOverride } : await playService.getAvailableRooms()
     this.listedRooms = res.rooms || []
     if (Array.isArray(res.rooms)) {
@@ -131,7 +143,7 @@ export class Matchmaking extends State {
     }
     if (!this.roomsPanel) return
     this.roomsPanel.clearControls()
-    
+
     const memo: Record<string, boolean> = {}
     const uniqueRooms: any[] = []
     for (const rr of (res.rooms || [])) {
@@ -191,10 +203,11 @@ export class Matchmaking extends State {
       cb.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
       cb.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
       cb.onIsCheckedChangedObservable.add((val) => {
+        console.log("[UI] Checkbox changed", { id: r.id, val, selected: this.selectedRoomId })
         if (!canJoinRow) return
         this.selectedRoomId = val ? r.id : ""
         this.updateJoinButtonState()
-        this.refreshRooms()
+        this.refreshRooms(this.listedRooms)
       })
       row.addControl(cb, 0, 0)
       const title = new TextBlock()

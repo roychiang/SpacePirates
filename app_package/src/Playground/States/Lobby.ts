@@ -7,11 +7,13 @@ import { GameDefinition } from "../Game"
 import { GameState } from "./GameState"
 import { authService } from "../../Viverse/Viverse"
 import { avatarService } from "../../Viverse/Viverse"
+import { Parameters } from "../Parameters"
 
 export class Lobby extends State {
   private playersPanel?: StackPanel
   private startBtn?: Button
   private startTimer?: number
+  private refreshTimer?: number
   private onRoomUpdated = () => this.refresh()
   private onActorJoined = () => this.refresh()
   private onActorLeft = () => this.refresh()
@@ -56,6 +58,8 @@ export class Lobby extends State {
     playService.on("actorLeft", this.onActorLeft)
     playService.on("readyStateChanged", this.onReadyChanged)
     this.loadStatus()
+    // Polling fallback to ensure lobby updates even if events are missed
+    this.refreshTimer = window.setInterval(() => this.refresh(), 3000)
   }
 
   private async refresh() {
@@ -66,8 +70,12 @@ export class Lobby extends State {
     const room = playService.getRoom()
     const ownerId = room ? room.master_client_id : ""
     const me = (playService as any).getActor ? (playService as any).getActor() : undefined
-    if ((!actors || actors.length === 0) && room && Array.isArray(room.actors) && room.actors.length > 0) {
-      actors = room.actors
+    // Fallback: use room.actors if SDK returned fewer actors
+    const roomActorCount = (room && Array.isArray(room.actors)) ? room.actors.length : 0
+    const sdkActorCount = actors ? actors.length : 0
+    if (sdkActorCount < roomActorCount) {
+      console.log(`[Lobby] Using room.actors: SDK returned ${sdkActorCount} but room has ${roomActorCount}`)
+      actors = room!.actors
     }
     if (me && (!actors.find(a => a.session_id === me.session_id))) {
       actors = (actors || []).concat([me])
@@ -155,6 +163,7 @@ export class Lobby extends State {
   public exit() {
     super.exit()
     if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
+    if (this.refreshTimer) { window.clearInterval(this.refreshTimer); this.refreshTimer = undefined }
     ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
       ; (playService as any).off?.("actorJoined", this.onActorJoined)
       ; (playService as any).off?.("actorLeft", this.onActorLeft)
@@ -173,15 +182,44 @@ export class Lobby extends State {
     GuiFramework.updateTopLeftAvatar(name, url)
   }
 
-  private tryStart() {
+  private async tryStart() {
     const room = playService.getRoom()
     const count = room ? Math.min(2, (room.actors || []).length) : 1
     const def = new GameDefinition()
     def.humanAllies = count
     def.humanEnemies = 0
-    def.aiAllies = 0
-    def.aiEnemies = 0
+    def.aiEnemies = Parameters.enemyCount
+    def.aiAllies = Parameters.allyCount
     GameState.gameDefinition = def
-    playService.startMultiplayer().then(() => { State.setCurrent(States.gameState) })
+
+    const me = (playService as any).getActor ? (playService as any).getActor() : undefined
+    const ownerId = room ? room.master_client_id : ""
+    const isOwner = !!me && !!ownerId && me.session_id === ownerId
+
+    if (isOwner) {
+      // Generate AI config
+      const aiConfig: any[] = [];
+      for (let i = 1; i <= def.aiAllies; i++) {
+        aiConfig.push({
+          type: 0,
+          pos: { x: Math.random() * 100 - 50, y: Math.random() * 100 - 50, z: Math.random() * 100 - 50 - 500 },
+          rot: { x: Math.random() * Math.PI * 2, y: Math.random() * Math.PI * 2, z: Math.random() * Math.PI * 2 }
+        });
+      }
+      for (let i = 1; i <= def.aiEnemies; i++) {
+        aiConfig.push({
+          type: 1,
+          pos: { x: Math.random() * 100 - 50, y: Math.random() * 100 - 50, z: Math.random() * 100 - 50 + 500 },
+          rot: { x: Math.random() * Math.PI * 2, y: Math.random() * Math.PI * 2, z: Math.random() * Math.PI * 2 }
+        });
+      }
+
+      // Save config and start game
+      await playService.updateRoomProperties({ ai_config: JSON.stringify(aiConfig), game_started: true });
+    }
+
+    playService.startMultiplayer().then(() => {
+      State.setCurrent(States.gameState)
+    })
   }
 }

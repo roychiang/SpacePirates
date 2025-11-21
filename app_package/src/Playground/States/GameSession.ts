@@ -1,6 +1,7 @@
 import { Scene, Nullable, GlowLayer } from "@babylonjs/core";
 import { Game, GameDefinition } from "../Game";
 import { Assets } from "../Assets";
+import { playService } from "../../Viverse/Viverse";
 
 export class GameSession {
 
@@ -31,7 +32,20 @@ export class GameSession {
 
     public start(gameDefinition: Nullable<GameDefinition>): void {
         console.log("[GameSession] start() called with:", gameDefinition);
-        this._game = new Game(this._assets, this._scene, this._canvas, gameDefinition, this._glowLayer);
+
+        // Calculate local player index based on room actors
+        let localPlayerIndex = 0;
+        const room = playService.getRoom();
+        const me = playService.getActor();
+        if (room && room.actors && me) {
+            const idx = room.actors.findIndex(a => a.session_id === me.session_id);
+            if (idx >= 0) {
+                localPlayerIndex = idx;
+            }
+        }
+        console.log("[GameSession] Calculated localPlayerIndex:", localPlayerIndex);
+
+        this._game = new Game(this._assets, this._scene, this._canvas, gameDefinition, this._glowLayer, localPlayerIndex);
     }
 
     public stop(): void {

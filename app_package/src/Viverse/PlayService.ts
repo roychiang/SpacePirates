@@ -86,7 +86,20 @@ export class PlayService {
                     byId[a.session_id] = { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
                   }
                   const merged = Object.keys(byId).map(k => byId[k])
-                  if (this.room) this.room.actors = merged
+                  console.log(`[Play] onRoomActorChange: merged ${merged.length} actors, this.room exists: ${!!this.room}`)
+                  if (this.room) {
+                    this.room.actors = merged
+                    console.log(`[Play] onRoomActorChange: SET this.room.actors to ${this.room.actors.length} actors`)
+                  } else {
+                    console.log(`[Play] onRoomActorChange: WARNING - this.room is undefined, attempting recovery...`)
+                    this.recoverRoom().then((recovered) => {
+                      if (recovered && this.room) {
+                        this.room.actors = merged;
+                        console.log(`[Play] onRoomActorChange: RECOVERED room and set ${this.room.actors.length} actors`);
+                        this.emit("roomUpdated", this.room);
+                      }
+                    });
+                  }
                   this.emit("roomUpdated", this.room)
                   return
                 }
@@ -107,6 +120,27 @@ export class PlayService {
       this.client = undefined
       console.log("[Play] viverse.Play not available")
     }
+  }
+
+  private async recoverRoom(): Promise<boolean> {
+    if (!this.client || !this.actor) return false;
+    try {
+      console.log("[Play] recoverRoom: fetching available rooms to find myself...");
+      const res = await this.client.getAvailableRooms();
+      if (res && Array.isArray(res.rooms)) {
+        const myRoom = res.rooms.find((r: Room) => Array.isArray(r.actors) && r.actors.some(a => a.session_id === this.actor!.session_id));
+        if (myRoom) {
+          console.log("[Play] recoverRoom: FOUND my room", myRoom.id);
+          this.room = myRoom;
+          this.emit("roomUpdated", this.room);
+          return true;
+        }
+      }
+      console.log("[Play] recoverRoom: could not find a room containing me");
+    } catch (e) {
+      console.log("[Play] recoverRoom error", e);
+    }
+    return false;
   }
 
   private waitConnected(timeoutMs: number = 8000): Promise<void> {
@@ -182,8 +216,9 @@ export class PlayService {
         const payload = { ...cfg, properties: { ...(cfg.properties || {}), open: true, visibility: "public", gameId: "SpacePirates", ownerName: cfg.name, expiresAt } }
         console.log("[Play] createRoom", payload)
         const res = await this.client.createRoom(payload)
-        console.log("[Play] createRoom result", res)
-        this.room = res?.room || this.room
+        console.log("[Play] createRoom result", JSON.stringify(res))
+        const room = res?.room || (res && res.id ? res : undefined) || this.room
+        this.room = room
         if (this.room) {
           if (!Array.isArray(this.room.actors) || this.room.actors.length === 0) {
             if (this.actor) this.room.actors = [this.actor]
@@ -201,8 +236,9 @@ export class PlayService {
               if (!hasMe) {
                 await this.waitConnected()
                 const j = await this.client.joinRoom(this.room.id)
-                console.log("[Play] auto-join after create", j)
-                this.room = j?.room || this.room
+                console.log("[Play] auto-join after create", JSON.stringify(j))
+                const joinedRoom = j?.room || (j && j.id ? j : undefined) || this.room
+                this.room = joinedRoom
                 if (this.room && this.actor && (!Array.isArray(this.room.actors) || !this.room.actors.find(a => a.session_id === this.actor!.session_id))) {
                   this.room.actors = (this.room.actors || []).concat([this.actor])
                 }
@@ -213,9 +249,10 @@ export class PlayService {
           }
         }
         this.emit("roomUpdated", this.room)
-        return { success: !!res?.room, room: this.room, message: res?.message }
+        return { success: !!this.room, room: this.room, message: res?.message }
       } catch (e) {
         console.log("[Play] createRoom error", e)
+        return { success: false, message: String(e) }
       }
     }
     const id = Math.random().toString(36).slice(2)
@@ -245,10 +282,10 @@ export class PlayService {
         const payload = { id: this.room.id, properties: { ...(this.room.properties || {}), ...props } }
         console.log("[Play] updateRoomProperties", payload)
         const res = await this.client.updateRoom(payload)
-        console.log("[Play] updateRoomProperties result", res)
-        this.room = res?.room || this.room
+        console.log("[Play] updateRoomProperties result", JSON.stringify(res))
+        this.room = res?.room || (res && res.id ? res : undefined) || this.room
         this.emit("roomUpdated", this.room)
-        return { success: !!res?.room, message: res?.message }
+        return { success: !!this.room, message: res?.message }
       } catch (e) {
         console.log("[Play] updateRoomProperties error", e)
         return { success: false, message: String(e) }
@@ -269,8 +306,8 @@ export class PlayService {
         console.log("[Play] joinRoom", roomId)
         await this.waitConnected()
         const res = await this.client.joinRoom(roomId)
-        console.log("[Play] joinRoom result", res)
-        this.room = res?.room || this.room
+        console.log("[Play] joinRoom result", JSON.stringify(res))
+        this.room = res?.room || (res && res.id ? res : undefined) || this.room
         if (this.room) {
           if (this.actor && (!Array.isArray(this.room.actors) || !this.room.actors.find(a => a.session_id === this.actor!.session_id))) {
             this.room.actors = (this.room.actors || []).concat([this.actor])
@@ -280,9 +317,10 @@ export class PlayService {
           }
         }
         this.emit("roomUpdated", this.room)
-        return { success: !!res?.room, room: this.room, message: res?.message }
+        return { success: !!this.room, room: this.room, message: res?.message }
       } catch (e) {
         console.log("[Play] joinRoom error", e)
+        return { success: false, message: String(e) }
       }
     }
     if (!this.room || this.room.id !== roomId) {
@@ -313,6 +351,7 @@ export class PlayService {
 
   async leaveRoom(): Promise<{ success: boolean; message?: string }> {
     const amOwner = !!this.actor && !!this.room && this.room.master_client_id === this.actor.session_id
+    console.log(`[Play] leaveRoom: amOwner=${amOwner}, master=${this.room?.master_client_id}, me=${this.actor?.session_id}`)
     if (amOwner && this.client && typeof this.client.closeRoom === "function") {
       try {
         await this.waitConnected()
@@ -384,6 +423,15 @@ export class PlayService {
                 if (data && data.type === "shot") {
                   this.emit("remoteShot", data.payload)
                 }
+                if (data && data.type === "spawnEnemy") {
+                  this.emit("spawnEnemy", data.payload)
+                }
+                if (data && data.type === "gameState") {
+                  this.emit("gameStateUpdate", data.payload)
+                }
+                if (data && data.type === "gameEnd") {
+                  this.emit("gameEnd", data.payload)
+                }
               } catch (e) {
                 console.log("[Net] onMessage parse error", e)
               }
@@ -402,7 +450,23 @@ export class PlayService {
   }
 
   broadcastInput(payload: { index: number; dx: number; dy: number; shooting: boolean; burst: boolean; breaking: boolean; launchMissile?: boolean; immelmann?: boolean }) {
-    const msg = JSON.stringify({ type: "input", payload })
+    this.broadcast("input", payload)
+  }
+
+  broadcastSpawnEnemy(payload: { id: string; position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number; w: number }; type: number }) {
+    this.broadcast("spawnEnemy", payload)
+  }
+
+  broadcastGameState(payload: { score: number; lives: number; wave: number }) {
+    this.broadcast("gameState", payload)
+  }
+
+  broadcastGameEnd(payload: { result: "victory" | "defeat" }) {
+    this.broadcast("gameEnd", payload)
+  }
+
+  private broadcast(type: string, payload: any) {
+    const msg = JSON.stringify({ type, payload })
     try {
       if (this.mpClient && typeof this.mpClient.sendMessage === "function") {
         this.mpClient.sendMessage(msg)
@@ -417,7 +481,7 @@ export class PlayService {
         return
       }
     } catch (e) {
-      console.log("[Net] broadcastInput error", e)
+      console.log(`[Net] broadcast ${type} error`, e)
     }
   }
 
@@ -447,11 +511,13 @@ export class PlayService {
     if (this.client && typeof this.client.getMyRoomActors === "function") {
       try {
         await this.waitConnected()
+        const localActorsBefore = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
+        console.log(`[Play] getMyRoomActors BEFORE SDK call: this.room.actors has ${localActorsBefore} actors`)
         const ts = new Date().toISOString()
         const t0 = performance.now()
         const res = await this.client.getMyRoomActors()
         const t1 = performance.now()
-        console.log("[Play] getMyRoomActors", { count: Array.isArray(res?.actors) ? res.actors.length : 0, ts, ms: Math.round(t1 - t0) })
+        console.log("[Play] getMyRoomActors SDK response", { count: Array.isArray(res?.actors) ? res.actors.length : 0, ts, ms: Math.round(t1 - t0) })
         let alist = Array.isArray(res?.actors) ? (res.actors as Actor[]) : []
         if (this.actor && (!Array.isArray(alist) || !alist.find((a: Actor) => a.session_id === this.actor!.session_id))) {
           alist = (alist || []).concat([this.actor])
@@ -492,12 +558,17 @@ export class PlayService {
             }
           } catch { }
         }
+        // Fallback: if SDK returns fewer actors than we have locally, use local data
+        const localActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
+        const sdkActorCount = alist ? alist.length : 0
+        console.log(`[Play] getMyRoomActors FALLBACK CHECK: SDK=${sdkActorCount}, Local=${localActorCount}`)
+        if (sdkActorCount < localActorCount) {
+          console.log(`[Play] getMyRoomActors USING FALLBACK: SDK returned ${sdkActorCount} actors but local has ${localActorCount}`, this.room!.actors.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
+          return { success: true, actors: this.room!.actors }
+        }
+        console.log(`[Play] getMyRoomActors UPDATING this.room.actors from ${localActorCount} to ${sdkActorCount} actors`)
         if (this.room) {
           this.room.actors = alist
-        }
-        if ((!alist || alist.length === 0) && this.room && Array.isArray(this.room.actors) && this.room.actors.length > 0) {
-          console.log("[Play] getMyRoomActors server-empty, using local room actors", this.room.actors.map((a: Actor) => ({ name: a.name })))
-          return { success: true, actors: this.room.actors }
         }
         return { success: true, actors: alist || [] }
       } catch (e) {
@@ -523,13 +594,18 @@ export class PlayService {
         const updated = j?.room || room
         const ulist = Array.isArray(updated.actors) ? updated.actors : []
         const present = !!ulist.find((a: Actor) => a.session_id === actor.session_id)
-        this.room = { ...updated, actors: present ? ulist : ulist.concat([actor]) }
+        // Preserve cached actors if SDK returned fewer actors
+        const cachedActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
+        const sdkActorCount = ulist.length
+        const finalActors = (sdkActorCount < cachedActorCount) ? this.room!.actors : (present ? ulist : ulist.concat([actor]))
+        console.log(`[Play] ensureActorPresentInRoom: SDK=${sdkActorCount}, Cached=${cachedActorCount}, Using=${finalActors.length} actors`)
+        this.room = { ...updated, actors: finalActors }
         this.emit("roomUpdated", this.room)
       }
     } catch { }
   }
 
-  on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot", handler: Handler) {
+  on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd", handler: Handler) {
     if (!this.listeners[event]) this.listeners[event] = []
     this.listeners[event].push(handler)
   }
@@ -539,7 +615,7 @@ export class PlayService {
     for (const h of arr) h(payload)
   }
 
-  off(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot", handler: Handler) {
+  off(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd", handler: Handler) {
     const arr = this.listeners[event] || []
     this.listeners[event] = arr.filter(h => h !== handler)
   }
@@ -552,9 +628,17 @@ export class PlayService {
         if (this.actorsRefreshing) return
         this.actorsRefreshing = true
         try {
+          const cachedActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
           const res = await this.getMyRoomActors()
+          const sdkActorCount = (res.actors && Array.isArray(res.actors)) ? res.actors.length : 0
           if (this.room) {
-            this.room.actors = res.actors || this.room.actors
+            // Only update if SDK returned more or equal actors than cached
+            if (sdkActorCount >= cachedActorCount) {
+              this.room.actors = res.actors || this.room.actors
+              console.log(`[Play] scheduleActorsRefresh: Updated actors from ${cachedActorCount} to ${sdkActorCount}`)
+            } else {
+              console.log(`[Play] scheduleActorsRefresh: Keeping cached ${cachedActorCount} actors, SDK only returned ${sdkActorCount}`)
+            }
           }
         } catch (e) {
           console.log("[Play] actors refresh error", e)

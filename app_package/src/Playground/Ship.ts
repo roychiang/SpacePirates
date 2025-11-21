@@ -31,12 +31,12 @@ enum ShipManeuver {
 const factions = [
     {
         trail: {
-            color: new Color3(0.64,0.42,0.15)
+            color: new Color3(0.64, 0.42, 0.15)
         }
     },
     {
         trail: {
-            color: new Color3(0.12,0.56,0.62)
+            color: new Color3(0.12, 0.56, 0.62)
         }
     }
 ];
@@ -53,15 +53,15 @@ export class Statistics {
     static enemiesCrash: number = 0;
 
     addDamageDealt(): void {
-        this.damageDealt ++;
+        this.damageDealt++;
     }
 
     addDamageTaken(): void {
-        this.damageTaken ++;
+        this.damageTaken++;
     }
 
     addShipDestroyed(): void {
-        this.shipsDestroyed ++;
+        this.shipsDestroyed++;
     }
 
     addTimeOfBattle(time: number): void {
@@ -69,23 +69,23 @@ export class Statistics {
     }
 
     addShotFired(): void {
-        this.shotFired ++;
+        this.shotFired++;
     }
 
     addShotHitting(): void {
-        this.shotHitting ++;
+        this.shotHitting++;
     }
 
     addMissilesFired(): void {
-        this.missilesFired ++;
+        this.missilesFired++;
     }
 
     static addCrashAlly(): void {
-        this.alliesCrash ++;
+        this.alliesCrash++;
     }
 
     static addCrashEnemy(): void {
-        this.enemiesCrash ++;
+        this.enemiesCrash++;
     }
 }
 
@@ -101,8 +101,8 @@ export class Ship extends Agent {
     isHuman: boolean = false;
     faction: number = 0;
     cannonIndex: number = 0;
-    localEye: Vector3 =  new Vector3(0,0,0);
-    localTarget:Vector3 =  new Vector3(0,0,0);
+    localEye: Vector3 = new Vector3(0, 0, 0);
+    localTarget: Vector3 = new Vector3(0, 0, 0);
     shipMesh: Nullable<AbstractMesh> = null;
     cannonR: Nullable<Vector3> = null;
     cannonL: Nullable<Vector3> = null;
@@ -138,8 +138,7 @@ export class Ship extends Agent {
     public thrusterPowerBlocks: InputBlock[] = [];
     private _glowLayer: GlowLayer;
 
-    constructor(assets: Assets, scene: Scene, glowLayer: GlowLayer)
-    {
+    constructor(assets: Assets, scene: Scene, glowLayer: GlowLayer) {
         super();
         this._assets = assets;
         this.targetSphere = null;
@@ -155,7 +154,7 @@ export class Ship extends Agent {
 
             this.missileSfx = this._assets.audio?.missileFireSound.clone() as Sound;
             this.explosionSfx = [this._assets.audio?.explosionSounds[0].clone() as Sound,
-                this._assets.audio?.explosionSounds[1].clone() as Sound];
+            this._assets.audio?.explosionSounds[1].clone() as Sound];
         }
         this.tickEnabled();
     }
@@ -179,16 +178,14 @@ export class Ship extends Agent {
         this.life = life;
         const isValkyrie = !faction;
         var clone;
-        if (this._assets.valkyrie && this._assets.raider)
-        {
+        if (this._assets.valkyrie && this._assets.raider) {
             if (isValkyrie) {
                 clone = this._assets.valkyrie.clone("valkyrie", null);
             } else {
                 clone = this._assets.raider.clone("raider", null);
             }
         }
-        if (clone)
-        {
+        if (clone) {
             this.shipMesh = clone;
             this.shipMesh.parent = this.root;
             this.shipMesh.scaling = this.shipMesh.scaling.scale(25);
@@ -199,12 +196,11 @@ export class Ship extends Agent {
         this.cannonR = isValkyrie ? this._assets.valkyriecannonR : this._assets.raidercannonR;
         this.cannonL = isValkyrie ? this._assets.valkyriecannonL : this._assets.raidercannonL;
 
-        if (isHuman)
-        {
+        if (isHuman) {
             this.statistics = new Statistics;
         }
 
-        this.trail = trailManager.spawnTrail(position, isValkyrie? 1 : 2);
+        this.trail = trailManager.spawnTrail(position, isValkyrie ? 1 : 2);
         if (this.trail) {
             this.trail.setParameters(factions[faction].trail.color, 1);
             this.trail.setVisible(!isHuman);
@@ -214,11 +210,11 @@ export class Ship extends Agent {
             this.laserHit.attachToMesh(this.root);
         }
         if (Parameters.enableAudio) {
-            const lasers = isHuman ? this._assets.audio?.heroLaserSounds:this._assets.audio?.raiderLaserSounds;
+            const lasers = isHuman ? this._assets.audio?.heroLaserSounds : this._assets.audio?.raiderLaserSounds;
             if (lasers) {
                 this.laser = [lasers[0].clone() as Sound,
-                    lasers[1].clone() as Sound,
-                    lasers[2].clone() as Sound];
+                lasers[1].clone() as Sound,
+                lasers[2].clone() as Sound];
             }
         }
 
@@ -231,20 +227,20 @@ export class Ship extends Agent {
     public static HandleThrustersShield(assets: Assets, ship: Nullable<Ship>, shipMesh: AbstractMesh, isValkyrie: boolean, defaultThrusterValue: number, glowLayer: GlowLayer): void {
         let thrusters: TransformNode[] = [];
         shipMesh.getChildTransformNodes(false).forEach((m: TransformNode) => {
-            if (m.name.endsWith(isValkyrie?"valkyrieShield_mesh":"raiderShield_mesh")) {
+            if (m.name.endsWith(isValkyrie ? "valkyrieShield_mesh" : "raiderShield_mesh")) {
                 if (ship) {
                     ship.shieldMain = m as Mesh;
                     ship.shieldMain.parent = null;
                     ship.shieldMain.rotation.set(0, Math.PI, 0);
-                    
+
                     if (isValkyrie) {
-                        ship.shieldMain.position.set(0,0.015 * 25 * 1.85, 0);
+                        ship.shieldMain.position.set(0, 0.015 * 25 * 1.85, 0);
                         ship.shieldMain.scaling.set(25 * 1.85, 25 * 1.85, 25 * 1.85);
                     } else {
                         ship.shieldMain.position.set(0, -0.009 * 25, 0.02 * 25 * 3.718);
                         ship.shieldMain.scaling.set(25 * 5.451, 25 * 1, 25 * 3.718);
                     }
-                    ship.shieldMain.scaling.multiplyInPlace(new Vector3(-1,1,1));
+                    ship.shieldMain.scaling.multiplyInPlace(new Vector3(-1, 1, 1));
                     ship.shieldMain.setEnabled(false);
                 }
             }
@@ -252,11 +248,11 @@ export class Ship extends Agent {
             if (m.name.endsWith("valkyrie_thruster_L1") ||
                 m.name.endsWith("valkyrie_thruster_L2") ||
                 m.name.endsWith("valkyrie_thruster_R1") ||
-                m.name.endsWith("valkyrie_thruster_R2") || 
+                m.name.endsWith("valkyrie_thruster_R2") ||
                 m.name.endsWith("raider_thruster_L") ||
                 m.name.endsWith("raider_thruster_R")) {
-                    thrusters.push(m);
-                }
+                thrusters.push(m);
+            }
         });
 
         // clone thrusters
@@ -267,8 +263,7 @@ export class Ship extends Agent {
         thrusters.forEach((thruster: TransformNode) => {
             let thrusterMesh = assets.thrusterMesh?.clone("thruster", thruster);
 
-            if (assets.thrusterShader && assets.vortexShader)
-            {
+            if (assets.thrusterShader && assets.vortexShader) {
                 const thrusterMat = assets.thrusterShader.clone("thrusterMat_" + thruster.name);
                 if (thrusterMat && thrusterMesh) {
                     thrusterMesh.material = thrusterMat;
@@ -328,12 +323,11 @@ export class Ship extends Agent {
         this.shipMesh?.setEnabled(this.isValid());
     }
 
-    public fireMissile(missileManager: MissileManager, bestPrey: Ship): Nullable<TransformNode>
-    {
+    public fireMissile(missileManager: MissileManager, bestPrey: Ship): Nullable<TransformNode> {
         if (!this.shipMesh) {
             return null;
         }
-        const missileName = "valkyrie_missileMount"+this.availableMissiles;
+        const missileName = "valkyrie_missileMount" + this.availableMissiles;
         const missileTransform = this.shipMesh.getChildTransformNodes(false, (node: Node) => { return (node as TransformNode).name.endsWith(missileName); })[0];
         if (!missileTransform) {
             return null;
@@ -343,7 +337,7 @@ export class Ship extends Agent {
         missileTransform.computeWorldMatrix(true);
         missileTransform.getWorldMatrix().decompose(undefined, worldOrientation, worldPosition);
         missileTransform.parent = null;
-        
+
         missileTransform.getChildMeshes()[0].position.scaleInPlace(25)
         missileTransform.getChildMeshes()[0].rotationQuaternion = null;
         missileTransform.getChildMeshes()[0].rotation.setAll(0);
@@ -352,9 +346,9 @@ export class Ship extends Agent {
         missileTransform.scaling.setAll(1);
         missileTransform.rotation.setAll(0);
         missileTransform.rotationQuaternion = worldOrientation;
-        
+
         missileManager.fireMissile(worldPosition, worldOrientation, bestPrey, this, missileTransform);
-        this.availableMissiles --;
+        this.availableMissiles--;
         return missileTransform;
     }
 
@@ -391,14 +385,14 @@ export class ShipManager {
     private _trailManager: TrailManager;
     time: number = 0;
     _scene: Scene;
-    private _tmpVec3 = new Vector3(0,0,0);
+    private _tmpVec3 = new Vector3(0, 0, 0);
     private _assets: Assets;
     private _tempMatrix = new Matrix();
     private _avoidPos = new Vector3();
     private static _tmpMatrix = new Matrix;
     //private _glowLayer: GlowLayer;
 
-    constructor(missileManager: MissileManager, shotManager: ShotManager, assets:Assets, trailManager: TrailManager, scene: Scene, maxShips: number, gameDefinition: GameDefinition, glowLayer: GlowLayer) {
+    constructor(missileManager: MissileManager, shotManager: ShotManager, assets: Assets, trailManager: TrailManager, scene: Scene, maxShips: number, gameDefinition: GameDefinition, glowLayer: GlowLayer) {
         this._gameDefinition = gameDefinition;
         this._missileManager = missileManager;
         this._shotManager = shotManager;
@@ -407,8 +401,7 @@ export class ShipManager {
         this._trailManager = trailManager;
         //this._glowLayer = glowLayer;
 
-        for (let i =0; i < maxShips; i++)
-        {
+        for (let i = 0; i < maxShips; i++) {
             this.ships.push(new Ship(this._assets, this._scene, glowLayer));
         }
 
@@ -420,7 +413,7 @@ export class ShipManager {
         for (let i = 0; i < this.ships.length; i++) {
             if (!this.ships[i].isValid()) {
                 const ship = this.ships[i];
-                const life = isHuman ? (faction ? this._gameDefinition.humanEnemiesLife : this._gameDefinition.humanAlliesLife) : 
+                const life = isHuman ? (faction ? this._gameDefinition.humanEnemiesLife : this._gameDefinition.humanAlliesLife) :
                     (faction ? this._gameDefinition.aiEnemiesLife : this._gameDefinition.aiAlliesLife);
                 ship.spawn(position, quat, isHuman, faction, this._trailManager, life);
                 return ship;
@@ -453,7 +446,7 @@ export class ShipManager {
     findBestPreyFor(index: number) {
         const ships = this.ships;
         const ship = ships[index];
-        let bestToChase = -1; 
+        let bestToChase = -1;
         let bestDot = Parameters.AIPerceptionCone
         ship.dotToEnemy = Parameters.AIPerceptionCone;
         ship.dotToAlly = Parameters.AIPerceptionCone;
@@ -488,7 +481,7 @@ export class ShipManager {
     // 1.0 = exactly facing shipB
     // -1.0 = facing away from shipB
     // 0.0 = perpendicular
-    public static dotToTarget(ship : Ship, position: Vector3) {
+    public static dotToTarget(ship: Ship, position: Vector3) {
         const chaseDir = position.subtract(ship.root.position);
         chaseDir.normalize();
         return Vector3.Dot(ship.forward, chaseDir);
@@ -501,26 +494,25 @@ export class ShipManager {
         })
         return count;
     }
- 
-    public tick(canShoot: boolean, humanInputs: Input[], deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number): void {
+
+    public tick(canShoot: boolean, humanInputs: Input[], deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number, isHost: boolean = true): void {
         if (gameSpeed <= 0.001) {
             return;
         }
 
         this.time += deltaTime;
-        
+
         const ships = this.ships;
-        for (var index = 0;index < ships.length; index++) {
+        for (var index = 0; index < ships.length; index++) {
             const ship = ships[index];
 
             ship.lastDecalTime -= deltaTime;
-            if (ship.lastDecalTime < 0 && ship.lastDecal)
-            {
+            if (ship.lastDecalTime < 0 && ship.lastDecal) {
                 ship.lastDecal.material?.dispose();
                 ship.lastDecal.dispose();
                 ship.lastDecal = null;
             }
-            
+
             ship.tickEnabled();
             if (!ship.isValid()) {
                 continue;
@@ -536,8 +528,8 @@ export class ShipManager {
             }
 
             this._tickGeneric(ship, input, deltaTime, gameSpeed, canShoot, targetGameSpeed);
-            this._tickShipVsShots(ship, input, sparksEffects, explosionManager);
-            this._tickShipVsMissile(ship, sparksEffects, explosionManager);
+            this._tickShipVsShots(ship, input, sparksEffects, explosionManager, isHost);
+            this._tickShipVsMissile(ship, sparksEffects, explosionManager, isHost);
 
             if (ship.isHuman) {
                 if (ship.missileCooldown <= 0) {
@@ -564,6 +556,23 @@ export class ShipManager {
         }
     }
 
+    public setShipState(index: number, life: number, position: { x: number, y: number, z: number }, rotation: { x: number, y: number, z: number, w: number }) {
+        if (index >= 0 && index < this.ships.length) {
+            const ship = this.ships[index];
+            if (ship.isValid()) {
+                ship.life = life;
+                // Only sync position/rotation for AI or remote players to avoid jitter on local control
+                // But for now, let's sync everything to ensure consistency, or maybe just AI?
+                // If we sync human player, we fight with local prediction.
+                // Let's sync if it's not the local human player? 
+                // But ShipManager doesn't know local player index easily.
+                // For now, let's just sync life. Position sync is harder without interpolation.
+                // ship.root.position.set(position.x, position.y, position.z);
+                // ship.root.rotationQuaternion?.set(rotation.x, rotation.y, rotation.z, rotation.w);
+            }
+        }
+    }
+
     private _tickAsteroids(ship: Ship, world: World, explosionManager: ExplosionManager): void {
         if (world.collideWithAsteroids(ship.root.position, 1.0)) {
             ship.life = -1;
@@ -584,8 +593,7 @@ export class ShipManager {
                 ship.explosionSfx[rand].setPosition(ship.position);
                 ship.explosionSfx[rand].play();
             }
-            if (ship.isHuman)
-            {
+            if (ship.isHuman) {
                 States.dead.ship = ship;
             }
             this.destroyShip(index);
@@ -635,7 +643,7 @@ export class ShipManager {
             }
         }
 
-        const rx = Quaternion.RotationAxis(new Vector3(0,1,0), input.dx);
+        const rx = Quaternion.RotationAxis(new Vector3(0, 1, 0), input.dx);
         const mat = this._tempMatrix;
         rx.toRotationMatrix(mat);
         const ry = Quaternion.RotationAxis(new Vector3(mat.m[0], mat.m[1], mat.m[2]), input.dy);
@@ -681,7 +689,7 @@ export class ShipManager {
         //ship.velocity *= 0.99;
 
         // trail
-        if (ship.trail && targetGameSpeed ===1) {
+        if (ship.trail && targetGameSpeed === 1) {
             ship.trail.append(ship.root.position);
             /*if (ship.isHuman) {
                 const dest = ship.box.position.clone();
@@ -698,7 +706,7 @@ export class ShipManager {
         if (canShoot && input.shooting && deltaTime > 0.001) {
             this._shotManager.addShot(ship, wmat, ship.isHuman, ship.cannonIndex);
             ship.statistics?.addShotFired();
-            ship.cannonIndex = (ship.cannonIndex + 1)&1;
+            ship.cannonIndex = (ship.cannonIndex + 1) & 1;
             if (ship.laser) {
                 const rand = Math.floor(Math.random() * ship.laser.length);
                 ship.laser[rand].play();
@@ -728,7 +736,7 @@ export class ShipManager {
         }
     }
 
-    private _tickShipVsMissile(ship: Ship, sparksEffects: SparksEffects, explosionManager: ExplosionManager) {
+    private _tickShipVsMissile(ship: Ship, sparksEffects: SparksEffects, explosionManager: ExplosionManager, isHost: boolean) {
         // missile / ship
         for (let p = 0; p < this._missileManager.missiles.length; p++) {
             const missile = this._missileManager.missiles[p];
@@ -738,8 +746,10 @@ export class ShipManager {
             if (missile.shipToChase == ship) {
                 const dist = Vector3.DistanceSquared(missile.getPosition(), ship.root.position);
                 if (dist < 200) {
-                    ship.life -= this._gameDefinition.missileDamage;
-                    ship.statistics?.addDamageTaken();
+                    if (isHost) {
+                        ship.life -= this._gameDefinition.missileDamage;
+                        ship.statistics?.addDamageTaken();
+                    }
                     missile.setTime(MISSILE_MAX_LIFE + 1);
                     // Ship died to missile
                     if (ship.life <= 0) {
@@ -751,7 +761,7 @@ export class ShipManager {
         }
     }
 
-    private _tickShipVsShots(ship: Ship, input: Input, sparksEffects: SparksEffects, explosionManager: ExplosionManager): void {
+    private _tickShipVsShots(ship: Ship, input: Input, sparksEffects: SparksEffects, explosionManager: ExplosionManager, isHost: boolean): void {
         const ships = this.ships;
 
         // shot / ship
@@ -760,14 +770,13 @@ export class ShipManager {
         const matrices = this._shotManager.getMatrices();
         for (let p = 0; p < MAX_SHOTS; p++) {
             if (pewpews[p].ttl > 0 && pewpews[p].firedBy != ship) {
-                tmpPewpewPos.set(matrices[p*16 + 12], matrices[p*16 + 13], matrices[p*16 + 14]);
+                tmpPewpewPos.set(matrices[p * 16 + 12], matrices[p * 16 + 13], matrices[p * 16 + 14]);
                 const dist = Vector3.DistanceSquared(ship.root.position, tmpPewpewPos);
                 if (dist <= 36) {
                     sparksEffects.addShot(ship.root.position, ship.root.rotationQuaternion ? ship.root.rotationQuaternion : Quaternion.Identity());
                     // shield effect
                     if (ship.shieldEffectMaterial && ship.shieldMain) {
-                        if (ship.lastDecal)
-                        {
+                        if (ship.lastDecal) {
                             ship.lastDecal.material?.dispose();
                             ship.lastDecal.dispose();
                         }
@@ -775,9 +784,9 @@ export class ShipManager {
 
                         ship.root.getWorldMatrix().invertToRef(ShipManager._tmpMatrix);
                         const localNormal = Vector3.TransformNormal(normal, ShipManager._tmpMatrix);
-                        
-                        var decalSize = new Vector3(7,7,7);
-                        ship.lastDecal = MeshBuilder.CreateDecal("decal", ship.shieldMain, {position: Vector3.Zero(), normal: localNormal, size: decalSize});
+
+                        var decalSize = new Vector3(7, 7, 7);
+                        ship.lastDecal = MeshBuilder.CreateDecal("decal", ship.shieldMain, { position: Vector3.Zero(), normal: localNormal, size: decalSize });
                         ship.lastDecalTime = 475;
                         ship.lastDecal.parent = ship.root;
                         let nodeMat = ship.shieldEffectMaterial.clone("shieldEffectMat");
@@ -794,15 +803,17 @@ export class ShipManager {
                     }
 
                     pewpews[p].ttl = -1;
-                    pewpews[p].firedBy?.statistics?.addDamageDealt();
-                    pewpews[p].firedBy?.statistics?.addShotHitting();
-                    ship.statistics?.addDamageTaken();
-                    ship.life -= this._gameDefinition.shotDamage;
+                    if (isHost) {
+                        pewpews[p].firedBy?.statistics?.addDamageDealt();
+                        pewpews[p].firedBy?.statistics?.addShotHitting();
+                        ship.statistics?.addDamageTaken();
+                        ship.life -= this._gameDefinition.shotDamage;
+                    }
                     if (!ship.isHuman) {
                         ship.evadeTimer = Parameters.AIEvadeTime;
                         const hitVector = tmpPewpewPos.subtract(ship.root.position);
                         const evadeDirection = hitVector.normalize();
-                        ship.evadeTo = ship.root.position.clone().addInPlace(evadeDirection.cross(ship.forward).multiplyByFloats(1000,1000,1000));
+                        ship.evadeTo = ship.root.position.clone().addInPlace(evadeDirection.cross(ship.forward).multiplyByFloats(1000, 1000, 1000));
                         if (pewpews[p].firedBy && pewpews[p].firedBy!.faction !== ship.faction) {
                             ship.bestPrey = ships.indexOf(pewpews[p].firedBy!);
                         }
@@ -855,8 +866,7 @@ export class ShipManager {
                 } else {
                     ship.bestPreyTime += localTime;
                 }
-                if (ship.bestPrey >= 0)
-                {
+                if (ship.bestPrey >= 0) {
                     ship.state = AIState.CHASE;
                 } else {
                     // wander around
@@ -879,12 +889,12 @@ export class ShipManager {
                 break;
             case AIState.EVADE:
                 input.burst = true;
-                ship.goToward(ship.evadeTo,ship.root.position, Parameters.AITurnRate);
+                ship.goToward(ship.evadeTo, ship.root.position, Parameters.AITurnRate);
                 break;
             case AIState.CHASE:
                 const enemy = ships[ship.bestPrey].root;
                 // position to aim the ship towards
-                const gotoPos = enemy.position.add(enemy.forward.normalizeToNew().multiplyByFloats(Parameters.AIFollowDistance,Parameters.AIFollowDistance,Parameters.AIFollowDistance));
+                const gotoPos = enemy.position.add(enemy.forward.normalizeToNew().multiplyByFloats(Parameters.AIFollowDistance, Parameters.AIFollowDistance, Parameters.AIFollowDistance));
                 // const aimWmat = enemy.getWorldMatrix();
                 // aimPos.addInPlace((new Vector3(aimWmat.m[8], aimWmat.m[9], aimWmat.m[10])).scale(100));
                 if (ship.targetSphere) {
@@ -892,7 +902,7 @@ export class ShipManager {
                 }
                 ship.goToward(gotoPos, ship.root.position, Parameters.AITurnRate);
                 // position we want to fire at - where we predict the enemy will be in the future
-                const firePos = enemy.position.add(enemy.forward.normalizeToNew().multiplyByFloats(Parameters.AIPredictionRange * ships[ship.bestPrey].velocity,Parameters.AIPredictionRange * ships[ship.bestPrey].velocity,Parameters.AIPredictionRange * ships[ship.bestPrey].velocity));
+                const firePos = enemy.position.add(enemy.forward.normalizeToNew().multiplyByFloats(Parameters.AIPredictionRange * ships[ship.bestPrey].velocity, Parameters.AIPredictionRange * ships[ship.bestPrey].velocity, Parameters.AIPredictionRange * ships[ship.bestPrey].velocity));
                 const fireDot = ShipManager.dotToTarget(ship, firePos)
                 const distanceToTarget = ship.root.position.subtract(enemy.position).length();
                 if ((distanceToTarget < Parameters.AIBreakDistance || ship.dotToEnemy < 0.4) && ship.velocity > Parameters.AIMinimumSpeed) {
