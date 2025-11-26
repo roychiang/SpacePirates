@@ -14,6 +14,7 @@ export class Lobby extends State {
   private startBtn?: Button
   private startTimer?: number
   private refreshTimer?: number
+  private isStarting = false
   private onRoomUpdated = () => this.refresh()
   private onActorJoined = () => this.refresh()
   private onActorLeft = () => this.refresh()
@@ -21,6 +22,7 @@ export class Lobby extends State {
 
   public enter() {
     super.enter()
+    this.isStarting = false
     if (!this._adt) return
     GuiFramework.setOrientation(this._adt)
     GuiFramework.createBottomBar(this._adt)
@@ -31,7 +33,9 @@ export class Lobby extends State {
     panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM
     root.addControl(panel, 0, 0)
     const content = GuiFramework.createTextPanel(root)
-    GuiFramework.createPageTitle("Lobby", content)
+    const room = playService.getRoom()
+    const mode = (room && room.properties && room.properties.game_mode === "pvp") ? "PvP" : "CO-OP"
+    GuiFramework.createPageTitle(`Lobby [${mode}]`, content)
     this.playersPanel = new StackPanel()
     content.addControl(this.playersPanel, 1, 1)
     const leaveBtn = GuiFramework.addButton("Leave Room", panel)
@@ -43,6 +47,7 @@ export class Lobby extends State {
       })
     })
     this.startBtn.onPointerDownObservable.add(async () => {
+      if (this.isStarting) return
       // Host clicks Start Game - signal all players to start
       await playService.updateRoomProperties({ game_started: true })
       this.tryStart()
@@ -63,9 +68,12 @@ export class Lobby extends State {
   }
 
   private async refresh() {
+    if (this.isStarting) return
     const res = await playService.getMyRoomActors()
+    // Check if disposed after await
+    if (!this.playersPanel || !this._adt) return
+
     let actors = res.actors || []
-    if (!this.playersPanel) return
     this.playersPanel.clearControls()
     const room = playService.getRoom()
     const ownerId = room ? room.master_client_id : ""
@@ -154,14 +162,19 @@ export class Lobby extends State {
     }
 
     // Check if game has been started via room properties
-    if (room && room.properties && room.properties.game_started === true) {
-      console.log("[Lobby] Game started detected, transitioning to game")
-      this.tryStart()
+    if (room && room.properties) {
+      // console.log("[Lobby] Checking game_started", room.properties.game_started)
+      if (room.properties.game_started === true || room.properties.game_started === "true") {
+        console.log("[Lobby] Game started detected, transitioning to game")
+        this.tryStart()
+      }
     }
   }
 
   public exit() {
     super.exit()
+    this.playersPanel = undefined
+    this.startBtn = undefined
     if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
     if (this.refreshTimer) { window.clearInterval(this.refreshTimer); this.refreshTimer = undefined }
     ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
@@ -183,14 +196,31 @@ export class Lobby extends State {
   }
 
   private async tryStart() {
+    if (this.isStarting) return
+    this.isStarting = true
+
     const room = playService.getRoom()
     const count = room ? Math.min(2, (room.actors || []).length) : 1
+    const gameMode = room?.properties?.game_mode || "coop"
+    console.log("[Lobby] tryStart: gameMode detected as:", gameMode, "raw:", room?.properties?.game_mode);
+
     const def = new GameDefinition()
-    def.humanAllies = count
-    def.humanEnemies = 0
+
+    // Set up game definition based on mode
+    if (gameMode === "pvp") {
+      def.humanAllies = 1
+      def.humanEnemies = 1
+      console.log("[Lobby] PvP mode: humanAllies=1, humanEnemies=1")
+    } else {
+      def.humanAllies = count
+      def.humanEnemies = 0
+      console.log("[Lobby] Co-op mode: humanAllies=" + count)
+    }
+
     def.aiEnemies = Parameters.enemyCount
     def.aiAllies = Parameters.allyCount
     GameState.gameDefinition = def
+    console.log("[Lobby] GameDefinition created:", def);
 
     const me = (playService as any).getActor ? (playService as any).getActor() : undefined
     const ownerId = room ? room.master_client_id : ""

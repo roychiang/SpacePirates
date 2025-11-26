@@ -36,11 +36,11 @@ export class Main extends State {
             GuiFramework.formatButtonGrid(grid);
             grid.addControl(panel, 0, 0);
 
-            const fallbackUrl = window.location.href.includes('/docs/') 
-                 ? window.location.origin + '/docs/' 
-                 : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-             const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
-             let logo = new Image("spacePirates", Assets.joinUrl(assetsHostUrl, "/assets/UI/spacePiratesLogo.svg"));
+            const fallbackUrl = window.location.href.includes('/docs/')
+                ? window.location.origin + '/docs/'
+                : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+            const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+            let logo = new Image("spacePirates", Assets.joinUrl(assetsHostUrl, "/assets/UI/spacePiratesLogo.svg"));
             logo.width = 0.7;
             logo.fixedRatio = 340 / 1040;
             logo.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
@@ -50,7 +50,7 @@ export class Main extends State {
             Main.playButton = GuiFramework.addButton("Play", panel);
             Main.playButton.isVisible = Assets.loadingComplete;
 
-            Main.playButton.onPointerDownObservable.add(function(info) {
+            Main.playButton.onPointerDownObservable.add(function (info) {
                 const gameDefinition = new GameDefinition();
                 // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
                 gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
@@ -62,7 +62,7 @@ export class Main extends State {
             });
 
             if (Parameters.allowSplitScreen) {
-                GuiFramework.addButton("Two Player Co-op", panel).onPointerDownObservable.add(function(info) {
+                GuiFramework.addButton("Two Player Co-op", panel).onPointerDownObservable.add(function (info) {
                     const gameDefinition = new GameDefinition();
                     gameDefinition.humanAllies = 2;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
@@ -72,7 +72,7 @@ export class Main extends State {
                     State.setCurrent(States.battleSelect);
                 });
 
-                GuiFramework.addButton("Two Players Vs", panel).onPointerDownObservable.add(function(info) {
+                GuiFramework.addButton("Two Players Vs", panel).onPointerDownObservable.add(function (info) {
                     const gameDefinition = new GameDefinition();
                     gameDefinition.humanAllies = 1;
                     gameDefinition.humanEnemies = 1;
@@ -84,16 +84,22 @@ export class Main extends State {
                 });
             }
 
-            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function (info) {
+                States.matchmaking.pvpMode = false;
                 State.setCurrent(States.matchmaking);
             });
 
-            GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
+                States.matchmaking.pvpMode = true;
+                State.setCurrent(States.matchmaking);
+            });
+
+            GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
                 States.options.backDestination = States.main;
                 State.setCurrent(States.options);
             });
 
-            GuiFramework.addButton("Credits", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Credits", panel).onPointerDownObservable.add(function (info) {
                 State.setCurrent(States.credits);
             });
             this._adt.addControl(grid);
@@ -102,8 +108,8 @@ export class Main extends State {
             panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
             panel.paddingBottom = "100px";
 
-            const fallbackUrl = window.location.href.includes('/docs/') 
-                ? window.location.origin + '/docs/' 
+            const fallbackUrl = window.location.href.includes('/docs/')
+                ? window.location.origin + '/docs/'
                 : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
             const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
             let logo = new Image("spacePirates", Assets.joinUrl(assetsHostUrl, "/assets/UI/spacePiratesLogo.svg"));
@@ -116,7 +122,7 @@ export class Main extends State {
             Main.playButton = GuiFramework.addButton("Play", panel);
             Main.playButton.isVisible = Assets.loadingComplete;
 
-            Main.playButton.onPointerDownObservable.add(function(info) {
+            Main.playButton.onPointerDownObservable.add(function (info) {
                 const gameDefinition = new GameDefinition();
                 // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
                 gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
@@ -128,7 +134,7 @@ export class Main extends State {
             });
 
             if (Parameters.allowSplitScreen) {
-                GuiFramework.addButton("Two Player Co-op", panel).onPointerDownObservable.add(function(info) {
+                GuiFramework.addButton("Two Player Co-op", panel).onPointerDownObservable.add(function (info) {
                     const gameDefinition = new GameDefinition();
                     gameDefinition.humanAllies = 2;
                     gameDefinition.aiEnemies = Parameters.enemyCount;
@@ -138,7 +144,7 @@ export class Main extends State {
                     State.setCurrent(States.battleSelect);
                 });
 
-                GuiFramework.addButton("Two Players Vs", panel).onPointerDownObservable.add(function(info) {
+                GuiFramework.addButton("Two Players Vs", panel).onPointerDownObservable.add(function (info) {
                     const gameDefinition = new GameDefinition();
                     gameDefinition.humanAllies = 1;
                     gameDefinition.humanEnemies = 1;
@@ -150,16 +156,22 @@ export class Main extends State {
                 });
             }
 
-            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function (info) {
+                States.matchmaking.pvpMode = false;
                 State.setCurrent(States.matchmaking);
             });
 
-            GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
+                States.matchmaking.pvpMode = true;
+                State.setCurrent(States.matchmaking);
+            });
+
+            GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
                 States.options.backDestination = States.main;
                 State.setCurrent(States.options);
             });
 
-            GuiFramework.addButton("Credits", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Credits", panel).onPointerDownObservable.add(function (info) {
                 State.setCurrent(States.credits);
             });
             this._adt.addControl(panel);

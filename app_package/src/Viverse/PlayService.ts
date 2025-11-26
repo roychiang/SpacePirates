@@ -1,3 +1,7 @@
+import * as Colyseus from "colyseus.js";
+import { getViverse } from "./Viverse";
+import { Config } from "../Config";
+
 export type Actor = {
   session_id: string
   name: string
@@ -29,117 +33,24 @@ export class PlayService {
   private room?: Room
   private listeners: Record<string, Handler[]> = {}
   private connected: boolean = false
-  private play: any
-  private client: any
-  private mpClient: any
-  private appId = "v48pybqy7f"
-  private actorsRefreshTimer?: number
-  private actorsRefreshing: boolean = false
+
+  private client?: Colyseus.Client
+  private colyseusRoom?: Colyseus.Room
+
+  // Default to local dev, user should update this for prod
+  private endpoint = Config.getColyseusEndpoint();
+  private appId = "spacepirates"
 
   init(): void { }
 
   async newMatchmakingClient(appId: string, debug?: boolean): Promise<void> {
-    this.appId = appId || this.appId
-    const sdk = getViverse()
-    if (sdk && typeof (sdk as any).Play === "function") {
-      try {
-        console.log("[Play] newMatchmakingClient start", { appId: this.appId, debug })
-        this.play = new (sdk as any).Play()
-        this.client = await this.play.newMatchmakingClient(this.appId, debug)
-        console.log("[Play] newMatchmakingClient ready", { hasClient: !!this.client })
-        if (this.client && typeof this.client.on === "function") {
-          try {
-            this.client.on("onConnect", async () => {
-              this.connected = true
-              console.log("[Play] onConnect")
-              this.emit("connected")
-            })
-            if (typeof (this.client as any).on === "function") {
-              try {
-                this.client.on("onDisconnect", () => {
-                  this.connected = false
-                  console.log("[Play] onDisconnect")
-                  this.room = undefined as any
-                  this.emit("roomUpdated", this.room)
-                  this.emit("roomListUpdated", { rooms: [] })
-                })
-              } catch { }
-            }
-            this.client.on("onRoomListUpdate", (rooms: Room[]) => {
-              console.log("[Play] onRoomListUpdate", Array.isArray(rooms) ? rooms.length : 0)
-              this.emit("roomListUpdated", { rooms })
-            })
-            this.client.on("onRoomActorChange", async (payload: any) => {
-              try { console.log("[Play] onRoomActorChange", payload) } catch { }
-              try {
-                if (Array.isArray(payload) || (payload && Array.isArray(payload.actors))) {
-                  const incoming: Actor[] = Array.isArray(payload) ? (payload as Actor[]) : (payload.actors as Actor[])
-                  const prev = Array.isArray(this.room?.actors) ? (this.room!.actors as Actor[]) : []
-                  const byId: Record<string, Actor> = {}
-                  for (const p of prev) byId[p.session_id] = p
-                  for (const a of (incoming || [])) {
-                    const prevMatch = byId[a.session_id]
-                    const isMe = !!this.actor && a.session_id === this.actor!.session_id
-                    const fromProps = (a as any)?.properties && typeof (a as any).properties["displayName"] === "string" ? String((a as any).properties["displayName"]) : ""
-                    const name = (isMe && this.actor!.name) || (a.name && String(a.name)) || fromProps || (prevMatch ? prevMatch.name : "")
-                    const mergedProps = this.mergeProps(prevMatch?.properties, a.properties, isMe)
-                    byId[a.session_id] = { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
-                  }
-                  const merged = Object.keys(byId).map(k => byId[k])
-                  console.log(`[Play] onRoomActorChange: merged ${merged.length} actors, this.room exists: ${!!this.room}`)
-                  if (this.room) {
-                    this.room.actors = merged
-                    console.log(`[Play] onRoomActorChange: SET this.room.actors to ${this.room.actors.length} actors`)
-                  } else {
-                    console.log(`[Play] onRoomActorChange: WARNING - this.room is undefined, attempting recovery...`)
-                    this.recoverRoom().then((recovered) => {
-                      if (recovered && this.room) {
-                        this.room.actors = merged;
-                        console.log(`[Play] onRoomActorChange: RECOVERED room and set ${this.room.actors.length} actors`);
-                        this.emit("roomUpdated", this.room);
-                      }
-                    });
-                  }
-                  this.emit("roomUpdated", this.room)
-                  return
-                }
-              } catch (e) {
-                console.log("[Play] onRoomActorChange payload apply error", e)
-              }
-              this.scheduleActorsRefresh()
-            })
-          } catch (e) {
-            console.log("[Play] bind events error", e)
-          }
-        }
-      } catch (e) {
-        console.log("[Play] newMatchmakingClient error", e)
-      }
-    } else {
-      this.play = undefined
-      this.client = undefined
-      console.log("[Play] viverse.Play not available")
-    }
+    console.log("[Play] newMatchmakingClient start", { endpoint: this.endpoint })
+    this.client = new Colyseus.Client(this.endpoint);
+    this.connected = true;
+    this.emit("connected");
   }
 
   private async recoverRoom(): Promise<boolean> {
-    if (!this.client || !this.actor) return false;
-    try {
-      console.log("[Play] recoverRoom: fetching available rooms to find myself...");
-      const res = await this.client.getAvailableRooms();
-      if (res && Array.isArray(res.rooms)) {
-        const myRoom = res.rooms.find((r: Room) => Array.isArray(r.actors) && r.actors.some(a => a.session_id === this.actor!.session_id));
-        if (myRoom) {
-          console.log("[Play] recoverRoom: FOUND my room", myRoom.id);
-          this.room = myRoom;
-          this.emit("roomUpdated", this.room);
-          return true;
-        }
-      }
-      console.log("[Play] recoverRoom: could not find a room containing me");
-    } catch (e) {
-      console.log("[Play] recoverRoom error", e);
-    }
     return false;
   }
 
@@ -153,15 +64,7 @@ export class PlayService {
 
   async setActor(actor: Actor): Promise<{ success: boolean; message?: string }> {
     this.actor = actor
-    if (this.client && typeof this.client.setActor === "function") {
-      try {
-        console.log("[Play] setActor", actor)
-        await this.waitConnected()
-        await this.client.setActor(actor)
-      } catch (e) {
-        console.log("[Play] setActor error", e)
-      }
-    }
+    console.log("[Play] setActor", actor)
     this.emit("actorJoined", actor)
     return { success: true }
   }
@@ -176,31 +79,27 @@ export class PlayService {
 
   async setReady(ready: boolean): Promise<{ success: boolean }> {
     if (!this.actor) return { success: false }
-    try {
-      this.actor.properties = { ...(this.actor.properties || {}), player_ready: ready ? "1" : "0" }
-      try { console.log("[Play] setReady", { session_id: this.actor.session_id, ready }) } catch { }
-      if (this.client && typeof this.client.setActor === "function") {
-        await this.waitConnected()
-        await this.client.setActor(this.actor)
-      }
-      if (this.room && Array.isArray(this.room.actors)) {
-        const idx = this.room.actors.findIndex(a => a.session_id === this.actor!.session_id)
-        if (idx >= 0) {
-          const a = this.room.actors[idx]
-          this.room.actors[idx] = { ...a, properties: { ...(a.properties || {}), player_ready: ready ? "1" : "0" } }
-        } else {
-          this.room.actors = (this.room.actors || []).concat([this.actor])
-        }
-      }
-      this.emit("readyStateChanged", { session_id: this.actor.session_id, ready })
-      return { success: true }
-    } catch (e) {
-      console.log("[Play] setReady error", e)
-      return { success: false }
+
+    // Update local actor props
+    this.actor.properties = { ...(this.actor.properties || {}), player_ready: ready ? "1" : "0" }
+
+    // Send to server if in room
+    if (this.colyseusRoom) {
+      this.colyseusRoom.send("ready", { ready });
     }
+
+    // Update local room state optimistically
+    if (this.room && Array.isArray(this.room.actors)) {
+      const idx = this.room.actors.findIndex(a => a.session_id === this.actor!.session_id)
+      if (idx >= 0) {
+        const a = this.room.actors[idx]
+        this.room.actors[idx] = { ...a, properties: { ...(a.properties || {}), player_ready: ready ? "1" : "0" } }
+      }
+    }
+
+    this.emit("readyStateChanged", { session_id: this.actor.session_id, ready })
+    return { success: true }
   }
-
-
 
   async createRoom(cfg: {
     name: string
@@ -209,192 +108,124 @@ export class PlayService {
     minPlayers: number
     properties?: Record<string, any>
   }): Promise<CreateRoomResult> {
-    if (this.client && typeof this.client.createRoom === "function") {
-      try {
-        await this.waitConnected()
-        const expiresAt = Date.now() + (30 * 60 * 1000)
-        const payload = { ...cfg, properties: { ...(cfg.properties || {}), open: true, visibility: "public", gameId: "SpacePirates", ownerName: cfg.name, expiresAt } }
-        console.log("[Play] createRoom", payload)
-        const res = await this.client.createRoom(payload)
-        console.log("[Play] createRoom result", JSON.stringify(res))
-        const room = res?.room || (res && res.id ? res : undefined) || this.room
-        this.room = room
-        if (this.room) {
-          if (!Array.isArray(this.room.actors) || this.room.actors.length === 0) {
-            if (this.actor) this.room.actors = [this.actor]
-          }
-          if (this.room.properties) {
-            if (typeof this.room.properties["expiresAt"] !== "number") this.room.properties["expiresAt"] = expiresAt
-            if (typeof this.room.properties["ownerName"] !== "string") this.room.properties["ownerName"] = cfg.name
-          }
-          if ((!this.room.master_client_id || this.room.master_client_id === "") && this.actor) {
-            this.room.master_client_id = this.actor.session_id
-          }
-          if (this.client && typeof this.client.joinRoom === "function" && this.actor) {
-            try {
-              const hasMe = !!this.room.actors.find(a => a.session_id === this.actor!.session_id)
-              if (!hasMe) {
-                await this.waitConnected()
-                const j = await this.client.joinRoom(this.room.id)
-                console.log("[Play] auto-join after create", JSON.stringify(j))
-                const joinedRoom = j?.room || (j && j.id ? j : undefined) || this.room
-                this.room = joinedRoom
-                if (this.room && this.actor && (!Array.isArray(this.room.actors) || !this.room.actors.find(a => a.session_id === this.actor!.session_id))) {
-                  this.room.actors = (this.room.actors || []).concat([this.actor])
-                }
-              }
-            } catch (e) {
-              console.log("[Play] auto-join error", e)
-            }
-          }
-        }
-        this.emit("roomUpdated", this.room)
-        return { success: !!this.room, room: this.room, message: res?.message }
-      } catch (e) {
-        console.log("[Play] createRoom error", e)
-        return { success: false, message: String(e) }
+    if (!this.client) return { success: false, message: "No client" }
+
+    try {
+      const options = {
+        name: cfg.name,
+        maxClients: cfg.maxPlayers,
+        properties: cfg.properties, // Pass properties to server
+        ...this.actor, // Pass actor info as options for onJoin
+        displayName: this.actor?.name,
+        headIconUrl: this.actor?.properties?.headIconUrl
+      };
+
+      console.log("[Play] creating room...", options);
+      this.colyseusRoom = await this.client.create("game_room", options);
+      this.setupRoomHandlers(this.colyseusRoom);
+
+      // Update local actor session_id to match Colyseus session_id
+      if (this.actor) {
+        this.actor.session_id = this.colyseusRoom.sessionId;
       }
+
+      // Construct local Room object
+      this.room = {
+        id: this.colyseusRoom.roomId,
+        app_id: this.appId,
+        mode: "team",
+        name: cfg.name,
+        actors: [this.actor!],
+        max_players: cfg.maxPlayers,
+        min_players: cfg.minPlayers,
+        is_closed: false,
+        properties: cfg.properties || {},
+        master_client_id: this.colyseusRoom.sessionId, // In Colyseus, we might not have a clear "master", but let's use our sessionId
+        game_session: "",
+        created_by_me: true
+      };
+
+      this.emit("roomUpdated", this.room);
+      return { success: true, room: this.room };
+    } catch (e) {
+      console.error("createRoom error", e);
+      return { success: false, message: String(e) };
     }
-    const id = Math.random().toString(36).slice(2)
-    const room: Room = {
-      id,
-      app_id: this.appId,
-      mode: "team",
-      name: cfg.name,
-      actors: this.actor ? [this.actor] : [],
-      max_players: cfg.maxPlayers,
-      min_players: cfg.minPlayers,
-      is_closed: false,
-      properties: { ...(cfg.properties || {}), open: true, visibility: "public", gameId: "SpacePirates", ownerName: cfg.name, expiresAt: Date.now() + (30 * 60 * 1000) },
-      master_client_id: this.actor ? this.actor.session_id : "",
-      game_session: "",
-      created_by_me: true
-    }
-    this.room = room
-    this.emit("roomUpdated", room)
-    return { success: true, room }
   }
 
   async updateRoomProperties(props: Record<string, any>): Promise<{ success: boolean; message?: string }> {
-    if (this.client && typeof this.client.updateRoom === "function" && this.room) {
-      try {
-        await this.waitConnected()
-        const payload = { id: this.room.id, properties: { ...(this.room.properties || {}), ...props } }
-        console.log("[Play] updateRoomProperties", payload)
-        const res = await this.client.updateRoom(payload)
-        console.log("[Play] updateRoomProperties result", JSON.stringify(res))
-        this.room = res?.room || (res && res.id ? res : undefined) || this.room
-        this.emit("roomUpdated", this.room)
-        return { success: !!this.room, message: res?.message }
-      } catch (e) {
-        console.log("[Play] updateRoomProperties error", e)
-        return { success: false, message: String(e) }
-      }
-    }
-    // Fallback for local testing or if client not available
+    // Colyseus rooms don't have generic property bag updates from client by default unless we implement it.
+    // For now, just update local
     if (this.room) {
       this.room.properties = { ...(this.room.properties || {}), ...props }
       this.emit("roomUpdated", this.room)
+
+      if (this.colyseusRoom) {
+        this.colyseusRoom.send("updateRoomProperties", props);
+      }
       return { success: true }
     }
     return { success: false, message: "no room" }
   }
 
   async joinRoom(roomId: string): Promise<JoinRoomResult> {
-    if (this.client && typeof this.client.joinRoom === "function") {
-      try {
-        console.log("[Play] joinRoom", roomId)
-        await this.waitConnected()
-        const res = await this.client.joinRoom(roomId)
-        console.log("[Play] joinRoom result", JSON.stringify(res))
-        this.room = res?.room || (res && res.id ? res : undefined) || this.room
-        if (this.room) {
-          if (this.actor && (!Array.isArray(this.room.actors) || !this.room.actors.find(a => a.session_id === this.actor!.session_id))) {
-            this.room.actors = (this.room.actors || []).concat([this.actor])
-          }
-          if ((!this.room.master_client_id || this.room.master_client_id === "") && this.actor) {
-            this.room.master_client_id = this.actor.session_id
-          }
-        }
-        this.emit("roomUpdated", this.room)
-        return { success: !!this.room, room: this.room, message: res?.message }
-      } catch (e) {
-        console.log("[Play] joinRoom error", e)
-        return { success: false, message: String(e) }
+    if (!this.client) return { success: false, message: "No client" }
+
+    try {
+      const options = {
+        ...this.actor,
+        displayName: this.actor?.name,
+        headIconUrl: this.actor?.properties?.headIconUrl
+      };
+
+      console.log("[Play] joining room...", roomId, options);
+      this.colyseusRoom = await this.client.joinById(roomId, options);
+      this.setupRoomHandlers(this.colyseusRoom);
+
+      // Update local actor session_id to match Colyseus session_id
+      if (this.actor) {
+        this.actor.session_id = this.colyseusRoom.sessionId;
       }
-    }
-    if (!this.room || this.room.id !== roomId) {
-      if (!this.actor) return { success: false, message: "no actor" }
-      const room: Room = {
-        id: roomId,
+
+      // We need to fetch room info or wait for state sync to populate this.room
+      // For now, create a skeleton
+      this.room = {
+        id: this.colyseusRoom.roomId,
         app_id: this.appId,
         mode: "team",
-        name: roomId,
-        actors: [this.actor],
-        max_players: 2,
-        min_players: 2,
+        name: "Room " + roomId, // We might need to fetch metadata
+        actors: [], // Will be populated by state sync
+        max_players: 4,
+        min_players: 1,
         is_closed: false,
         properties: {},
-        master_client_id: this.actor.session_id,
+        master_client_id: "",
         game_session: "",
         created_by_me: false
-      }
-      this.room = room
-    } else {
-      if (this.actor && !this.room.actors.find(a => a.session_id === this.actor!.session_id)) {
-        this.room.actors.push(this.actor)
-      }
+      };
+
+      this.emit("roomUpdated", this.room);
+      return { success: true, room: this.room };
+    } catch (e) {
+      console.error("joinRoom error", e);
+      return { success: false, message: String(e) };
     }
-    this.emit("roomUpdated", this.room)
-    return { success: true, room: this.room }
   }
 
   async leaveRoom(): Promise<{ success: boolean; message?: string }> {
-    const amOwner = !!this.actor && !!this.room && this.room.master_client_id === this.actor.session_id
-    console.log(`[Play] leaveRoom: amOwner=${amOwner}, master=${this.room?.master_client_id}, me=${this.actor?.session_id}`)
-    if (amOwner && this.client && typeof this.client.closeRoom === "function") {
-      try {
-        await this.waitConnected()
-        const res = await this.client.closeRoom()
-        console.log("[Play] closeRoom result", res)
-      } catch (e) {
-        console.log("[Play] closeRoom error", e)
-      }
+    if (this.colyseusRoom) {
+      this.colyseusRoom.leave();
+      this.colyseusRoom = undefined;
     }
-    if (this.client && typeof this.client.leaveRoom === "function") {
-      try {
-        await this.waitConnected()
-        const res = await this.client.leaveRoom()
-        console.log("[Play] leaveRoom result", res)
-        return { success: true, message: res?.message }
-      } catch (e) {
-        console.log("[Play] leaveRoom error", e)
-      }
-    }
-    if (this.actor && this.room) {
-      this.room.actors = this.room.actors.filter(a => a.session_id !== this.actor!.session_id)
-      if (this.room.actors.length === 0) {
-        console.log("[Play] room empty, removing")
-        this.room = undefined as any
-      }
-      this.emit("actorLeft", this.actor)
-    }
-    return { success: true }
+    this.room = undefined as any;
+    this.emit("actorLeft", this.actor);
+    return { success: true };
   }
 
   async closeRoom(): Promise<{ success: boolean; message?: string }> {
-    if (this.client && typeof this.client.closeRoom === "function") {
-      try {
-        const res = await this.client.closeRoom()
-        console.log("[Play] closeRoom result", res)
-        return { success: true, message: res?.message }
-      } catch (e) {
-        console.log("[Play] closeRoom error", e)
-      }
-    }
-    if (this.room) this.room.is_closed = true
-    this.emit("roomUpdated", this.room)
-    return { success: true }
+    // In Colyseus, leaving usually closes if empty, or we can lock it.
+    // For now, just leave.
+    return this.leaveRoom();
   }
 
   getRoom(): Room | undefined {
@@ -402,207 +233,60 @@ export class PlayService {
   }
 
   async startMultiplayer(): Promise<{ success: boolean }> {
-    const roomId = this.room?.id || ""
-    const sdk = getViverse()
-    if (sdk && (sdk as any).Play && typeof (sdk as any).Play.MultiplayerClient === "function" && roomId) {
-      try {
-        console.log("[Net] MultiplayerClient start", { roomId, appId: this.appId })
-        this.mpClient = new (sdk as any).Play.MultiplayerClient(roomId, this.appId)
-        if (typeof this.mpClient.init === "function") {
-          await this.mpClient.init()
-        }
-        console.log("[Net] MultiplayerClient ready", { hasClient: !!this.mpClient })
-        if (this.mpClient && typeof this.mpClient.on === "function") {
-          try {
-            this.mpClient.on("onMessage", (msg: any) => {
-              try {
-                const data = typeof msg === "string" ? JSON.parse(msg) : msg
-                if (data && data.type === "input") {
-                  this.emit("remoteInput", data.payload)
-                }
-                if (data && data.type === "shot") {
-                  this.emit("remoteShot", data.payload)
-                }
-                if (data && data.type === "spawnEnemy") {
-                  this.emit("spawnEnemy", data.payload)
-                }
-                if (data && data.type === "gameState") {
-                  this.emit("gameStateUpdate", data.payload)
-                }
-                if (data && data.type === "gameEnd") {
-                  this.emit("gameEnd", data.payload)
-                }
-              } catch (e) {
-                console.log("[Net] onMessage parse error", e)
-              }
-            })
-          } catch (e) {
-            console.log("[Net] bind mp events error", e)
-          }
-        }
-        return { success: true }
-      } catch (e) {
-        console.log("[Net] MultiplayerClient error", e)
-      }
-    }
-    console.log("[Net] multiplayer not available")
-    return { success: false }
+    // Already started if we have a room
+    return { success: !!this.colyseusRoom };
   }
 
   broadcastInput(payload: { index: number; dx: number; dy: number; shooting: boolean; burst: boolean; breaking: boolean; launchMissile?: boolean; immelmann?: boolean }) {
-    this.broadcast("input", payload)
+    this.colyseusRoom?.send("input", payload);
   }
 
   broadcastSpawnEnemy(payload: { id: string; position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number; w: number }; type: number }) {
-    this.broadcast("spawnEnemy", payload)
+    this.colyseusRoom?.send("spawnEnemy", payload);
   }
 
   broadcastGameState(payload: { score: number; lives: number; wave: number }) {
-    this.broadcast("gameState", payload)
+    this.colyseusRoom?.send("gameState", payload);
   }
 
   broadcastGameEnd(payload: { result: "victory" | "defeat" }) {
-    this.broadcast("gameEnd", payload)
-  }
-
-  private broadcast(type: string, payload: any) {
-    const msg = JSON.stringify({ type, payload })
-    try {
-      if (this.mpClient && typeof this.mpClient.sendMessage === "function") {
-        this.mpClient.sendMessage(msg)
-        return
-      }
-      if (this.mpClient && typeof this.mpClient.send === "function") {
-        this.mpClient.send(msg)
-        return
-      }
-      if (this.mpClient && typeof this.mpClient.broadcast === "function") {
-        this.mpClient.broadcast(msg)
-        return
-      }
-    } catch (e) {
-      console.log(`[Net] broadcast ${type} error`, e)
-    }
+    this.colyseusRoom?.send("gameEnd", payload);
   }
 
   async getAvailableRooms(): Promise<{ success: boolean; rooms: Room[] }> {
-    if (this.client && typeof this.client.getAvailableRooms === "function") {
-      try {
-        await this.waitConnected()
-        const ts = new Date().toISOString()
-        const t0 = performance.now()
-        const res = await this.client.getAvailableRooms()
-        const t1 = performance.now()
-        console.log("[Play] getAvailableRooms", { count: Array.isArray(res?.rooms) ? res.rooms.length : 0, ts, ms: Math.round(t1 - t0) })
-        if (Array.isArray(res?.rooms)) {
-          const list = (res.rooms || []) as Room[]
-          console.log("[Play] rooms detail", list.map((r: Room) => ({ id: r.id, name: r.name, mode: r.mode, max: r.max_players, min: r.min_players, closed: r.is_closed, actors: ((r.actors || []) as Actor[]).map((a: Actor) => ({ name: a.name, ready: a.properties?.["player_ready"] === 1 || a.properties?.["player_ready"] === "1" })) })))
-        }
-        return { success: true, rooms: res?.rooms || [] }
-      } catch (e) {
-        console.log("[Play] getAvailableRooms error", e)
-      }
+    if (!this.client) return { success: false, rooms: [] }
+
+    try {
+      const rooms = await (this.client as any).getAvailableRooms("game_room");
+      const mapped: Room[] = rooms.map((r: any) => ({
+        id: r.roomId,
+        app_id: this.appId,
+        mode: "team",
+        name: r.metadata?.name || ("Room " + r.roomId),
+        actors: new Array(r.clients).fill({} as Actor), // We don't know actors details from listing
+        max_players: r.maxClients,
+        min_players: 1,
+        is_closed: r.locked,
+        properties: r.metadata || {},
+        master_client_id: "",
+        game_session: "",
+        created_by_me: false
+      }));
+
+      return { success: true, rooms: mapped };
+    } catch (e) {
+      console.error("getAvailableRooms error", e);
+      return { success: false, rooms: [] };
     }
-    console.log("[Play] getAvailableRooms fallback", [])
-    return { success: true, rooms: [] }
   }
 
   async getMyRoomActors(): Promise<{ success: boolean; actors: Actor[] }> {
-    if (this.client && typeof this.client.getMyRoomActors === "function") {
-      try {
-        await this.waitConnected()
-        const localActorsBefore = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
-        console.log(`[Play] getMyRoomActors BEFORE SDK call: this.room.actors has ${localActorsBefore} actors`)
-        const ts = new Date().toISOString()
-        const t0 = performance.now()
-        const res = await this.client.getMyRoomActors()
-        const t1 = performance.now()
-        console.log("[Play] getMyRoomActors SDK response", { count: Array.isArray(res?.actors) ? res.actors.length : 0, ts, ms: Math.round(t1 - t0) })
-        let alist = Array.isArray(res?.actors) ? (res.actors as Actor[]) : []
-        if (this.actor && (!Array.isArray(alist) || !alist.find((a: Actor) => a.session_id === this.actor!.session_id))) {
-          alist = (alist || []).concat([this.actor])
-        }
-        const prev = Array.isArray(this.room?.actors) ? (this.room!.actors as Actor[]) : []
-        alist = (alist || []).map((a: Actor) => {
-          const prevMatch = prev.find((p: Actor) => p.session_id === a.session_id)
-          const isMe = !!this.actor && a.session_id === this.actor!.session_id
-          const fromProps = (a as any)?.properties && typeof (a as any).properties["displayName"] === "string" ? String((a as any).properties["displayName"]) : ""
-          const name = (isMe && this.actor!.name) || (a.name && String(a.name)) || fromProps || (prevMatch ? prevMatch.name : "")
-          const mergedProps = this.mergeProps(prevMatch?.properties, a.properties, isMe)
-          return { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
-        })
-        console.log("[Play] actors detail", alist.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
-        // 合併 getAvailableRooms 中的我方房間資料，若其演員列表更完整或可補齊 ready
-        if (this.client && typeof this.client.getAvailableRooms === "function" && this.room && this.room.id) {
-          try {
-            const resRooms = await this.client.getAvailableRooms()
-            const my = Array.isArray(resRooms?.rooms) ? (resRooms.rooms as Room[]).find((r: Room) => r.id === this.room!.id) : undefined
-            if (my && Array.isArray(my.actors)) {
-              const repl = (my.actors as Actor[])
-              const hasMissingReady = (alist || []).some((a: Actor) => typeof (a.properties || {})["player_ready"] === "undefined")
-              const shouldMerge = repl.length >= alist.length || hasMissingReady
-              if (shouldMerge) {
-                const prev2 = Array.isArray(this.room?.actors) ? (this.room!.actors as Actor[]) : []
-                const byId: Record<string, Actor> = {}
-                for (const p of (alist || [])) byId[p.session_id] = p
-                for (const a of (repl || [])) {
-                  const prevMatch = byId[a.session_id] || prev2.find((p: Actor) => p.session_id === a.session_id)
-                  const isMe = !!this.actor && a.session_id === this.actor!.session_id
-                  const fromProps = (a as any)?.properties && typeof (a as any).properties["displayName"] === "string" ? String((a as any).properties["displayName"]) : ""
-                  const name = (isMe && this.actor!.name) || (a.name && String(a.name)) || fromProps || (prevMatch ? (prevMatch as Actor).name : "")
-                  const mergedProps = this.mergeProps((prevMatch as any)?.properties, a.properties, isMe)
-                  byId[a.session_id] = { ...a, name: name && name.length > 0 ? name : (a.session_id ? a.session_id.slice(0, 8) : "Player"), properties: mergedProps }
-                }
-                alist = Object.keys(byId).map(k => byId[k])
-              }
-            }
-          } catch { }
-        }
-        // Fallback: if SDK returns fewer actors than we have locally, use local data
-        const localActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
-        const sdkActorCount = alist ? alist.length : 0
-        console.log(`[Play] getMyRoomActors FALLBACK CHECK: SDK=${sdkActorCount}, Local=${localActorCount}`)
-        if (sdkActorCount < localActorCount) {
-          console.log(`[Play] getMyRoomActors USING FALLBACK: SDK returned ${sdkActorCount} actors but local has ${localActorCount}`, this.room!.actors.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
-          return { success: true, actors: this.room!.actors }
-        }
-        console.log(`[Play] getMyRoomActors UPDATING this.room.actors from ${localActorCount} to ${sdkActorCount} actors`)
-        if (this.room) {
-          this.room.actors = alist
-        }
-        return { success: true, actors: alist || [] }
-      } catch (e) {
-        console.log("[Play] getMyRoomActors error", e)
-      }
-    }
-    const actors = this.room ? this.room.actors : []
-    console.log("[Play] getMyRoomActors fallback", actors.map((a: Actor) => ({ name: a.name, ready: this.isReady(a.properties?.["player_ready"]) })))
-    return { success: true, actors }
+    // Handled by state sync
+    return { success: true, actors: this.room?.actors || [] };
   }
 
   async ensureActorPresentInRoom(): Promise<void> {
-    const actor = this.actor
-    const room = this.room
-    if (!actor || !room || !room.id) return
-    try {
-      const res = await this.getMyRoomActors()
-      const list = res.actors || []
-      const hasMe = !!list.find((a: Actor) => a.session_id === actor.session_id)
-      if (!hasMe && this.client && typeof this.client.joinRoom === "function") {
-        await this.waitConnected()
-        const j = await this.client.joinRoom(room.id)
-        const updated = j?.room || room
-        const ulist = Array.isArray(updated.actors) ? updated.actors : []
-        const present = !!ulist.find((a: Actor) => a.session_id === actor.session_id)
-        // Preserve cached actors if SDK returned fewer actors
-        const cachedActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
-        const sdkActorCount = ulist.length
-        const finalActors = (sdkActorCount < cachedActorCount) ? this.room!.actors : (present ? ulist : ulist.concat([actor]))
-        console.log(`[Play] ensureActorPresentInRoom: SDK=${sdkActorCount}, Cached=${cachedActorCount}, Using=${finalActors.length} actors`)
-        this.room = { ...updated, actors: finalActors }
-        this.emit("roomUpdated", this.room)
-      }
-    } catch { }
+    // No-op for Colyseus, handled by join
   }
 
   on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd", handler: Handler) {
@@ -620,72 +304,54 @@ export class PlayService {
     this.listeners[event] = arr.filter(h => h !== handler)
   }
 
-  private scheduleActorsRefresh() {
-    try {
-      if (this.actorsRefreshTimer) { window.clearTimeout(this.actorsRefreshTimer); this.actorsRefreshTimer = undefined }
-      this.actorsRefreshTimer = window.setTimeout(async () => {
-        this.actorsRefreshTimer = undefined
-        if (this.actorsRefreshing) return
-        this.actorsRefreshing = true
-        try {
-          const cachedActorCount = (this.room && Array.isArray(this.room.actors)) ? this.room.actors.length : 0
-          const res = await this.getMyRoomActors()
-          const sdkActorCount = (res.actors && Array.isArray(res.actors)) ? res.actors.length : 0
-          if (this.room) {
-            // Only update if SDK returned more or equal actors than cached
-            if (sdkActorCount >= cachedActorCount) {
-              this.room.actors = res.actors || this.room.actors
-              console.log(`[Play] scheduleActorsRefresh: Updated actors from ${cachedActorCount} to ${sdkActorCount}`)
-            } else {
-              console.log(`[Play] scheduleActorsRefresh: Keeping cached ${cachedActorCount} actors, SDK only returned ${sdkActorCount}`)
-            }
-          }
-        } catch (e) {
-          console.log("[Play] actors refresh error", e)
+  private setupRoomHandlers(room: Colyseus.Room) {
+    room.onStateChange((state: any) => {
+      console.log("Room state changed:", state);
+      this.syncState(state);
+    });
+
+    room.onMessage("input", (msg) => this.emit("remoteInput", msg));
+    room.onMessage("shot", (msg) => this.emit("remoteShot", msg));
+    room.onMessage("spawnEnemy", (msg) => this.emit("spawnEnemy", msg));
+    room.onMessage("gameState", (msg) => this.emit("gameStateUpdate", msg));
+    room.onMessage("gameEnd", (msg) => this.emit("gameEnd", msg));
+  }
+
+  private syncState(state: any) {
+    if (!this.room) return;
+
+    // Sync players
+    const players: Actor[] = [];
+    state.players.forEach((p: any, sessionId: string) => {
+      players.push({
+        session_id: sessionId,
+        name: p.name,
+        properties: {
+          headIconUrl: p.headIconUrl,
+          displayName: p.displayName,
+          player_ready: p.ready ? "1" : "0",
+          joinOrder: String(p.joinOrder || 0)
         }
-        this.actorsRefreshing = false
-        this.emit("roomUpdated", this.room)
-      }, 150)
-    } catch { }
-  }
+      });
+    });
 
-  private isReady(val: any): boolean {
-    return val === 1 || val === "1" || val === true
-  }
+    // Sort by joinOrder to maintain join sequence (P1=0, P2=1, etc)
+    this.room.actors = players.sort((a, b) => {
+      const aOrder = parseInt((a.properties?.joinOrder as string) || "0");
+      const bOrder = parseInt((b.properties?.joinOrder as string) || "0");
+      return aOrder - bOrder;
+    });
 
-  private mergeProps(prevProps?: Record<string, number | string>, newProps?: Record<string, number | string>, isMe?: boolean): Record<string, number | string> {
-    const p = prevProps || {}
-    const n = newProps || {}
-    const merged: Record<string, number | string> = { ...p, ...n }
-    const m = this.mergeReady(p["player_ready"], n["player_ready"]) as any
-    if (typeof m !== "undefined") merged["player_ready"] = m
-    if (isMe && this.actor && this.actor.properties) {
-      // Restore local override for Optimistic UI
-      if (typeof this.actor.properties["player_ready"] !== "undefined") merged["player_ready"] = this.actor.properties["player_ready"] as any
-      if (typeof this.actor.properties["headIconUrl"] === "string") merged["headIconUrl"] = this.actor.properties["headIconUrl"] as any
-      if (typeof (this.actor as any).properties["displayName"] === "string") merged["displayName"] = (this.actor as any).properties["displayName"] as any
+    // Sync properties
+    if (state.properties) {
+      const props: Record<string, any> = {};
+      state.properties.forEach((val: any, key: string) => {
+        props[key] = val;
+      });
+      console.log("[Play] syncState properties:", props);
+      this.room.properties = { ...(this.room.properties || {}), ...props };
     }
-    return merged
-  }
 
-  private mergeReady(prev: any, next: any): number | undefined {
-    // Always prefer the new value from server (next) over cached value (prev)
-    // This ensures ready state can toggle from 1 -> 0 and 0 -> 1
-    if (typeof next !== 'undefined') {
-      const n = this.isReady(next)
-      const result = n ? 1 : 0
-      console.log(`[Play] mergeReady: prev=${prev}, next=${next} => ${result}`)
-      return result
-    }
-    // Only use prev if next is undefined
-    if (typeof prev !== 'undefined') {
-      const p = this.isReady(prev)
-      const result = p ? 1 : 0
-      console.log(`[Play] mergeReady: prev=${prev}, next=undefined => ${result}`)
-      return result
-    }
-    console.log(`[Play] mergeReady: prev=undefined, next=undefined => undefined`)
-    return undefined
+    this.emit("roomUpdated", this.room);
   }
 }
-import { getViverse } from "./Viverse"

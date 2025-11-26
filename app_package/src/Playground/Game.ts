@@ -97,36 +97,57 @@ export class Game {
 
         this.activeCameras = [];
         for (let i = 0; i < gameDefinition.humanAllies; i++) {
-            const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, 0);
+            const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, i);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
                 ship.shipCamera = camera
-                // Assign control index for this human ship
-                ship.controlIndex = i;
-                // Ensure an input slot exists for this player index
-                InputManager.getOrCreateInput(i);
-                console.log('[Game] Ally ship spawned with controlIndex', i);
+                // Assign control index: local player's ship uses index 0 (keyboard/mouse)
+                // Remote players' ships use their broadcast index
+                // FIX: Shift control index by 1 to reserve index 0 for local physical input
+                ship.controlIndex = i + 1;
+
+                // Ensure an input slot exists for this ship's control index
+                InputManager.getOrCreateInput(ship.controlIndex);
+                console.log('[Game] Ally ship spawned:', { spawnIndex: i, controlIndex: ship.controlIndex, isLocal: i === this._localPlayerIndex });
                 this.humanPlayerShips.push(ship);
-                this.activeCameras.push(camera.getFreeCamera());
+
+                // Only add camera for local player
+                if (i === this._localPlayerIndex) {
+                    this.activeCameras.push(camera.getFreeCamera());
+                }
             }
         }
-
-        this._world = new World(assets, scene, gameDefinition, this.activeCameras[0], glowLayer);
 
         for (let i = 0; i < gameDefinition.humanEnemies; i++) {
             const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, 500), Quaternion.FromEulerAngles(0, Math.PI, 0), true, 1);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
                 ship.shipCamera = camera;
-                // Assign control index for enemy human ships after allies indices
-                ship.controlIndex = gameDefinition.humanAllies + i;
-                // Ensure an input slot exists for this player index
+
+                // Calculate which player this enemy ship belongs to
+                const enemyPlayerIndex = gameDefinition.humanAllies + i;
+
+                // Assign control index: local player's ship uses index 0 (keyboard/mouse)
+                // Remote players' ships use their broadcast index
+                // FIX: Shift control index by 1
+                ship.controlIndex = enemyPlayerIndex + 1;
+
+                // Ensure an input slot exists for this ship's control index
                 InputManager.getOrCreateInput(ship.controlIndex);
-                console.log('[Game] Enemy ship spawned with controlIndex', ship.controlIndex);
+                console.log('[Game] Enemy ship spawned:', { spawnIndex: i, enemyPlayerIndex, controlIndex: ship.controlIndex, isLocal: enemyPlayerIndex === this._localPlayerIndex });
                 this.humanPlayerShips.push(ship);
-                this.activeCameras.push(camera.getFreeCamera());
+
+                // Only add camera for local player
+                if (enemyPlayerIndex === this._localPlayerIndex) {
+                    this.activeCameras.push(camera.getFreeCamera());
+                }
             }
         }
+
+        // Create World AFTER all ships are spawned so activeCameras is populated
+        // Use first active camera, or create a dummy if none (shouldn't happen in normal gameplay)
+        const worldCamera = this.activeCameras.length > 0 ? this.activeCameras[0] : new FreeCamera("dummyCamera", new Vector3(0, 0, 0), scene);
+        this._world = new World(assets, scene, gameDefinition, worldCamera, glowLayer);
 
         this._cameraDummy = new FreeCamera("camera1", new Vector3(0, 0, 0), scene);
         this._cameraDummy.layerMask = 0x10000000;
@@ -135,7 +156,7 @@ export class Game {
 
         // Cameras: split-screen based on input devices (keyboard + gamepads)
         // Keep at least 1 camera, cap to available ship cameras
-        const requestedCamCount = Math.max(1, 1 + GamepadInput.gamepads.length);
+        const requestedCamCount = 1; // Force 1 camera for networked multiplayer
         const shipCameras = this.activeCameras;
         const playerCamCount = Math.min(requestedCamCount, shipCameras.length);
         const playerCameras = shipCameras.slice(0, playerCamCount);
@@ -156,8 +177,8 @@ export class Game {
             viewports: playerCameras.map(c => ({ x: c.viewport.x, width: c.viewport.width })),
             dummyViewport: { x: this._cameraDummy.viewport.x, width: this._cameraDummy.viewport.width }
         });
-        if (this.humanPlayerShips.length) {
-            this._world.ship = this.humanPlayerShips[0];
+        if (this.humanPlayerShips.length > this._localPlayerIndex) {
+            this._world.ship = this.humanPlayerShips[this._localPlayerIndex];
         }
 
         // Spawn AI from Room Properties Config
@@ -236,7 +257,9 @@ export class Game {
         this._world.removeAsteroids(new Vector3(0, 0, -500), 50);
         this._world.removeAsteroids(new Vector3(0, 0, 500), 50);
 
-        this._HUD = new HUD(this._shipManager, assets, scene, this.humanPlayerShips);
+        // Only create HUD for local player
+        const localShip = this.humanPlayerShips[this._localPlayerIndex];
+        this._HUD = new HUD(this._shipManager, assets, scene, localShip ? [localShip] : []);
         scene.customLODSelector = (mesh: AbstractMesh, camera: Camera) => { return mesh; };
         scene.freezeMaterials();
         //AbstractMesh.isInFrustum = function() { return true; };
@@ -256,8 +279,23 @@ export class Game {
                 shootFrame = 130; // can shoot only every 130 ms
             }
             try {
-                const local = InputManager.getOrCreateInput(this._localPlayerIndex);
-                playService.broadcastInput({ index: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.breaking, launchMissile: local.launchMissile, immelmann: local.immelmann });
+                // Each player reads from their own input slot based on localPlayerIndex
+                const local = InputManager.getOrCreateInput(0);
+
+                // Copy physical input (0) to logical input slot (localPlayerIndex + 1)
+                const logicalInput = InputManager.getOrCreateInput(this._localPlayerIndex + 1);
+                logicalInput.dx = local.dx;
+                logicalInput.dy = local.dy;
+                logicalInput.shooting = local.shooting;
+                logicalInput.burst = local.burst;
+                logicalInput.breaking = local.breaking;
+                logicalInput.launchMissile = local.launchMissile;
+                logicalInput.immelmann = local.immelmann;
+
+                if (local.dx !== 0 || local.dy !== 0 || local.shooting) {
+                    // console.log('[Game] Broadcasting input:', { localPlayerIndex: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting });
+                }
+                playService.broadcastInput({ index: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.burst, launchMissile: local.launchMissile, immelmann: local.immelmann });
             } catch { }
 
             const isHost = this._localPlayerIndex === 0;
@@ -271,15 +309,19 @@ export class Game {
                     const shipsData = this._shipManager.ships.map((s, idx) => ({
                         index: idx,
                         life: s.life,
-                        // position: { x: s.root.position.x, y: s.root.position.y, z: s.root.position.z },
-                        // rotation: { x: s.root.rotationQuaternion?.x, y: s.root.rotationQuaternion?.y, z: s.root.rotationQuaternion?.z, w: s.root.rotationQuaternion?.w }
+                        position: { x: s.root.position.x, y: s.root.position.y, z: s.root.position.z },
+                        rotation: { x: s.root.rotationQuaternion?.x, y: s.root.rotationQuaternion?.y, z: s.root.rotationQuaternion?.z, w: s.root.rotationQuaternion?.w }
                     }));
-                    playService.broadcastGameState({
-                        score: 0, // TODO: implement score
-                        lives: 0, // TODO: implement shared lives
-                        wave: 0,
-                        ships: shipsData
-                    } as any);
+                    try {
+                        playService.broadcastGameState({
+                            score: 0, // TODO: implement score
+                            lives: 0, // TODO: implement shared lives
+                            wave: 0,
+                            ships: shipsData
+                        } as any);
+                    } catch (e) {
+                        console.warn("Failed to broadcast game state:", e);
+                    }
                 }
             }
 
@@ -314,7 +356,8 @@ export class Game {
             playService.on("remoteInput", (p: any) => {
                 if (!p) return;
                 const idx = typeof p.index === 'number' ? p.index : 1;
-                const target = InputManager.getOrCreateInput(idx);
+                // Remote input targets the logical slot (index + 1)
+                const target = InputManager.getOrCreateInput(idx + 1);
                 target.dx = p.dx || 0;
                 target.dy = p.dy || 0;
                 target.shooting = !!p.shooting;

@@ -7,10 +7,9 @@ import { GamepadInput } from './GamepadInput';
 import { Settings } from "../../Settings";
 import { useNative } from "../../playgroundRunner";
 
-declare var document : any;
+declare var document: any;
 
-export class Input
-{
+export class Input {
     dx: number = 0;
     dy: number = 0;
     shooting: boolean = false;
@@ -28,8 +27,8 @@ export class Input
 // credit: https://stackoverflow.com/questions/4817029/whats-the-best-way-to-detect-a-touch-screen-device-using-javascript
 function isTouchDevice() {
     return (('ontouchstart' in window) ||
-       (navigator.maxTouchPoints > 0) ||
-       ((navigator as any).msMaxTouchPoints > 0));
+        (navigator.maxTouchPoints > 0) ||
+        ((navigator as any).msMaxTouchPoints > 0));
 }
 
 export class InputManager {
@@ -56,7 +55,7 @@ export class InputManager {
             const nav: any = navigator as any;
             if (nav && typeof nav.getGamepads === 'function') {
                 const original = nav.getGamepads.bind(nav);
-                nav.getGamepads = function() {
+                nav.getGamepads = function () {
                     try {
                         const list = original() || [];
                         return Array.prototype.map.call(list, (gp: any) => {
@@ -72,7 +71,7 @@ export class InputManager {
                                 });
                             } catch {
                                 if (typeof gp.id !== 'string') {
-                                    try { gp.id = ''; } catch {}
+                                    try { gp.id = ''; } catch { }
                                 }
                                 return gp;
                             }
@@ -83,11 +82,10 @@ export class InputManager {
                 }
                 InputManager._patchedGamepads = true;
             }
-        } catch {}
+        } catch { }
     }
 
-    constructor(scene: Scene, canvas: HTMLCanvasElement)
-    {
+    constructor(scene: Scene, canvas: HTMLCanvasElement) {
         InputManager._scene = scene;
         InputManager._canvas = canvas;
 
@@ -107,8 +105,8 @@ export class InputManager {
                         InputManager.input.launchMissile = true;
                     } else*/ if (kbInfo.event.keyCode == 87) {
                         InputManager.input.burst = true;
-                    } else if (kbInfo.event.keyCode == 83){
-                        InputManager.input.breaking  = true;
+                    } else if (kbInfo.event.keyCode == 83) {
+                        InputManager.input.breaking = true;
                     } else if (kbInfo.event.keyCode == 81) {
                         InputManager.input.immelmann = true;
                     }
@@ -120,15 +118,15 @@ export class InputManager {
                         InputManager.input.launchMissile = false;
                     } else*/ if (kbInfo.event.keyCode == 87) {
                         InputManager.input.burst = false;
-                    } else if (kbInfo.event.keyCode == 83){
-                        InputManager.input.breaking  = false;
+                    } else if (kbInfo.event.keyCode == 83) {
+                        InputManager.input.breaking = false;
                     } else if (kbInfo.event.keyCode == 81) {
                         InputManager.input.immelmann = false;
                     }
                     break;
             }
         });
-        
+
         try {
             GamepadInput.initialize();
         } catch (e) {
@@ -136,8 +134,7 @@ export class InputManager {
         }
     }
 
-    static mouseMove(e: any)
-    {
+    static mouseMove(e: any) {
         if (InputManager.isTouch) {
             return;
         }
@@ -145,15 +142,15 @@ export class InputManager {
         const deltaTime = InputManager.deltaTime;//._scene.getEngine().getDeltaTime();
 
         var movementX = e.movementX ||
-                e.mozMovementX ||
-                e.webkitMovementX ||
-                0;
+            e.mozMovementX ||
+            e.webkitMovementX ||
+            0;
 
         var movementY = e.movementY ||
-                e.mozMovementY ||
-                e.webkitMovementY ||
-                0;
-        
+            e.mozMovementY ||
+            e.webkitMovementY ||
+            0;
+
         const input = InputManager.getOrCreateInput(0);
         input.dx = movementX * Parameters.mouseSensitivty * deltaTime;
         input.dy = movementY * Parameters.mouseSensitivty * deltaTime;
@@ -165,14 +162,16 @@ export class InputManager {
         input.launchMissile = e.buttons == 2;
     }
 
-    static changeCallback(e: any)
-    {
+    private static _isRequestingPointerLock: boolean = false;
+
+    static changeCallback(e: any) {
         const pointerEventType = Tools.IsSafari() ? "mouse" : "pointer";
         if (document.pointerLockElement === InputManager._canvas ||
             document.mozPointerLockElement === InputManager._canvas ||
             document.webkitPointerLockElement === InputManager._canvas
-        ){
+        ) {
             // we've got a pointerlock for our element, add a mouselistener
+            InputManager._isRequestingPointerLock = false;
             document.addEventListener(`${pointerEventType}move`, InputManager.mouseMove, false);
             document.addEventListener(`${pointerEventType}down`, InputManager.mouseMove, false);
             document.addEventListener(`${pointerEventType}up`, InputManager.mouseMove, false);
@@ -182,7 +181,10 @@ export class InputManager {
             document.removeEventListener(`${pointerEventType}down`, InputManager.mouseMove, false);
             document.removeEventListener(`${pointerEventType}up`, InputManager.mouseMove, false);
 
-            State.setCurrent(States.inGameMenu);
+            // Only transition to in-game menu if we're not in the middle of requesting pointer lock
+            if (!InputManager._isRequestingPointerLock) {
+                State.setCurrent(States.inGameMenu);
+            }
         }
     };
 
@@ -193,7 +195,7 @@ export class InputManager {
             }
             var canvas = InputManager._canvas;
             if (canvas) {
-                canvas.onclick = function(){};
+                canvas.onclick = function () { };
             }
         }
     }
@@ -209,15 +211,22 @@ export class InputManager {
             // when element is clicked, we're going to request a
             // pointerlock
             var canvas = InputManager._canvas;
-            canvas.onclick = function(){
-                canvas.requestPointerLock = 
-                canvas.requestPointerLock ||
-                canvas.mozRequestPointerLock ||
-                canvas.webkitRequestPointerLock
-                ;
+            canvas.onclick = function () {
+                InputManager._isRequestingPointerLock = true;
+                canvas.requestPointerLock =
+                    canvas.requestPointerLock ||
+                    canvas.mozRequestPointerLock ||
+                    canvas.webkitRequestPointerLock
+                    ;
 
                 // Ask the browser to lock the pointer)
-                canvas.requestPointerLock();
+                const promise = (canvas.requestPointerLock() as any);
+                if (promise && typeof promise.catch === 'function') {
+                    promise.catch((e: any) => {
+                        console.warn("Pointer lock failed", e);
+                        InputManager._isRequestingPointerLock = false;
+                    });
+                }
             };
         }
     }

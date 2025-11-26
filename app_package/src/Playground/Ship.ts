@@ -561,14 +561,21 @@ export class ShipManager {
             const ship = this.ships[index];
             if (ship.isValid()) {
                 ship.life = life;
-                // Only sync position/rotation for AI or remote players to avoid jitter on local control
-                // But for now, let's sync everything to ensure consistency, or maybe just AI?
-                // If we sync human player, we fight with local prediction.
-                // Let's sync if it's not the local human player? 
-                // But ShipManager doesn't know local player index easily.
-                // For now, let's just sync life. Position sync is harder without interpolation.
-                // ship.root.position.set(position.x, position.y, position.z);
-                // ship.root.rotationQuaternion?.set(rotation.x, rotation.y, rotation.z, rotation.w);
+                // Only sync position/rotation for remote ships (not the local player's ship if they are controlling it)
+                // We assume controlIndex matches ship index for human players, but we need to check if this ship is controlled by local player.
+                // However, ShipManager doesn't know local player index.
+                // But generally, we should sync everything except what we are predicting.
+                // For now, let's sync if it's not the ship we are currently driving.
+                // Since we don't have local index here easily, we can check if ship.isHuman and if input is local?
+                // Actually, Game.ts calls this. Game.ts knows local player index.
+                // But wait, Game.ts calls this for ALL ships in the packet.
+                // We should filter in Game.ts or here.
+                // Let's just update transform. If it's local player, it might jitter, but we need to see.
+                // Ideally, we only update if (index !== localPlayerIndex).
+                // But ShipManager doesn't know localPlayerIndex.
+                // Let's update the transform directly for now.
+                if (position) ship.root.position.set(position.x, position.y, position.z);
+                if (rotation) ship.root.rotationQuaternion?.set(rotation.x, rotation.y, rotation.z, rotation.w);
             }
         }
     }
