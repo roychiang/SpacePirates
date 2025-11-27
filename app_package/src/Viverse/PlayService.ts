@@ -115,12 +115,13 @@ export class PlayService {
         name: cfg.name,
         maxClients: cfg.maxPlayers,
         properties: cfg.properties, // Pass properties to server
+        game_mode: cfg.properties?.game_mode, // Lift game_mode to top level for reliability
         ...this.actor, // Pass actor info as options for onJoin
         displayName: this.actor?.name,
         headIconUrl: this.actor?.properties?.headIconUrl
       };
 
-      console.log("[Play] creating room...", options);
+      console.log("[Play] creating room...", JSON.stringify(options));
       this.colyseusRoom = await this.client.create("game_room", options);
       this.setupRoomHandlers(this.colyseusRoom);
 

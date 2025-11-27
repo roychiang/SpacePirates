@@ -24,10 +24,14 @@ export class GameRoom extends Room<GameState> {
     onCreate(options: any) {
         this.setState(new GameState());
 
+        console.log("GameRoom created with options:", options);
+
         // Set room metadata for listing (includes game_mode for PVP/Co-op filtering)
         const metadata: any = {
-            name: options.name || "Game Room"
+            name: options.name || "Game Room",
+            game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop"
         };
+        
         if (options.properties) {
             console.log("Initializing room properties:", options.properties);
             Object.assign(metadata, options.properties);
@@ -35,6 +39,13 @@ export class GameRoom extends Room<GameState> {
                 this.state.properties.set(key, String(options.properties[key]));
             }
         }
+        
+        // Ensure game_mode is explicitly set in metadata if found in options
+        if (options.game_mode) {
+            metadata.game_mode = options.game_mode;
+            this.state.properties.set("game_mode", options.game_mode);
+        }
+
         this.setMetadata(metadata);
         console.log("Room metadata set:", metadata);
 

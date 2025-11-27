@@ -44,7 +44,7 @@ export class Matchmaking extends State {
     panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM
     root.addControl(panel, 0, 0)
     const content = GuiFramework.createTextPanel(root)
-    GuiFramework.createPageTitle("Matchmaking", content)
+    GuiFramework.createPageTitle(this.pvpMode ? "MATCHMAKING [PvP]" : "MATCHMAKING [CO-OP]", content)
     console.log("[UI] SDK", !!getViverse(), "TOKEN", false)
     this.roomsPanel = new StackPanel()
     this.roomsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
@@ -118,7 +118,7 @@ export class Matchmaking extends State {
         gameId: "SpacePirates",
         game_mode: this.pvpMode ? "pvp" : "coop"
       };
-      console.log("[UI] Creating room with properties:", roomProperties);
+      console.log("[UI] Creating room with properties:", JSON.stringify(roomProperties));
       const res = await playService.createRoom({
         name,
         mode: "team",
@@ -223,9 +223,11 @@ export class Matchmaking extends State {
     const expectedMode = this.pvpMode ? "pvp" : "coop"
     const allRooms = res.rooms || []
     const filteredRooms = allRooms.filter((r: any) => {
-      const roomMode = r.properties?.game_mode || "coop" // Default to coop if not set
+      // Check both properties (mapped from metadata) and metadata directly if available
+      const props = r.properties || r.metadata || {}
+      const roomMode = props.game_mode || "coop" // Default to coop if not set
       const matches = roomMode === expectedMode
-      console.log("[UI] Room filter check:", { roomId: r.id, roomName: r.name, roomMode, expectedMode, matches, properties: r.properties })
+      console.log("[UI] Room filter check:", { roomId: r.id, roomName: r.name, roomMode, expectedMode, matches, properties: props })
       return matches
     })
 

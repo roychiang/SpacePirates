@@ -97,7 +97,7 @@ export class Game {
 
         this.activeCameras = [];
         for (let i = 0; i < gameDefinition.humanAllies; i++) {
-            const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, i);
+            const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, 0);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
                 ship.shipCamera = camera
@@ -335,7 +335,8 @@ export class Game {
             this._shotManager.tick(deltaTime, this._world);
             this._missileManager.tick(deltaTime, this._explosions, this._world);
             if (this._HUD) {
-                this._HUD.tick(scene.getEngine(), this._speed, this.humanPlayerShips);
+                const ls = this.humanPlayerShips[this._localPlayerIndex];
+                this._HUD.tick(scene.getEngine(), this._speed, ls ? [ls] : []);
             }
             if (this._recorder) {
                 this._recorder.tick();
