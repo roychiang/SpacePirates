@@ -56,6 +56,7 @@ export class Game {
     public humanPlayerShips: Array<Ship> = new Array<Ship>();
     public activeCameras: Array<Camera> = new Array<Camera>();
     private _delayedEnd: number;
+    private _gameDefinition: GameDefinition;
     //private _glowLayer: GlowLayer;
 
     private _localPlayerIndex: number = 0;
@@ -74,6 +75,7 @@ export class Game {
             gameDefinition.aiAllies = Parameters.allyCount;
             console.log("Using default game definition");
         }
+        this._gameDefinition = gameDefinition;
         console.log("[Game] Starting with:", {
             humanAllies: gameDefinition.humanAllies,
             humanEnemies: gameDefinition.humanEnemies,
@@ -233,11 +235,19 @@ export class Game {
 
             // Client listens for game end
             playService.on("gameEnd", (p: any) => {
-                if (p && p.result === "victory") {
-                    States.victory.ship = this.humanPlayerShips[0]; // Just use local player for camera focus
+                let isVictory = false;
+                if (p && p.winnerFaction !== undefined) {
+                    const myFaction = this.humanPlayerShips[this._localPlayerIndex].faction;
+                    isVictory = (myFaction === p.winnerFaction);
+                } else if (p && p.result === "victory") {
+                    isVictory = true;
+                }
+
+                if (isVictory) {
+                    States.victory.ship = this.humanPlayerShips[this._localPlayerIndex]; // Just use local player for camera focus
                     if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
                     State.setCurrent(States.victory);
-                } else if (p && p.result === "defeat") {
+                } else if (p && (p.result === "defeat" || !isVictory)) {
                     if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
                     State.setCurrent(States.dead);
                 }
@@ -247,7 +257,14 @@ export class Game {
             playService.on("gameStateUpdate", (p: any) => {
                 if (p && p.ships && Array.isArray(p.ships)) {
                     p.ships.forEach((s: any) => {
-                        this._shipManager.setShipState(s.index, s.life, s.position, s.rotation);
+                        let pos = s.position;
+                        let rot = s.rotation;
+                        // Skip position/rotation update for local player to avoid jitter
+                        if (s.index === this._localPlayerIndex) {
+                            pos = null;
+                            rot = null;
+                        }
+                        this._shipManager.setShipState(s.index, s.life, pos, rot);
                     });
                 }
             });
@@ -406,41 +423,74 @@ export class Game {
     }
 
     private _checkVictory(deltaTime: number): void {
-        var enemyCount = 0;
-        var player: Nullable<Ship> = null;
-        this._shipManager.ships.forEach((ship, shipIndex) => {
-            if (ship.isValid()) {
-                if (ship.faction == 1) {
-                    enemyCount++;
+        if (this._gameDefinition.humanEnemies > 0) {
+            // PvP Logic
+            let faction0Alive = false;
+            let faction1Alive = false;
+            this._shipManager.ships.forEach(s => {
+                if (s.isValid()) {
+                    if (s.faction === 0) faction0Alive = true;
+                    if (s.faction === 1) faction1Alive = true;
                 }
-                if (ship.isHuman) {
-                    player = ship;
-                }
-            }
-        });
+            });
 
-        if (!player) {
-            if (this._delayedEnd <= 0) {
-                if (this._HUD) {
-                    this._HUD.dispose();
-                    this._HUD = null;
+            let winnerFaction = -1;
+            if (!faction0Alive) winnerFaction = 1;
+            else if (!faction1Alive) winnerFaction = 0;
+
+            if (winnerFaction !== -1) {
+                if (this._delayedEnd <= 0) {
+                     playService.broadcastGameEnd({ winnerFaction: winnerFaction });
+                     if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
+                     
+                     const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                     if (myShip.faction === winnerFaction) {
+                         States.victory.ship = myShip;
+                         State.setCurrent(States.victory);
+                     } else {
+                         State.setCurrent(States.dead);
+                     }
                 }
-                playService.broadcastGameEnd({ result: "defeat" });
-                State.setCurrent(States.dead);
+                this._delayedEnd -= deltaTime;
             }
-            this._delayedEnd -= deltaTime;
-        }
-        else if (!enemyCount) {
-            if (this._delayedEnd <= 0) {
-                States.victory.ship = player;
-                if (this._HUD) {
-                    this._HUD.dispose();
-                    this._HUD = null;
+        } else {
+            // Co-op Logic
+            var enemyCount = 0;
+            var player: Nullable<Ship> = null;
+            this._shipManager.ships.forEach((ship, shipIndex) => {
+                if (ship.isValid()) {
+                    if (ship.faction == 1) {
+                        enemyCount++;
+                    }
+                    if (ship.isHuman) {
+                        player = ship;
+                    }
                 }
-                playService.broadcastGameEnd({ result: "victory" });
-                State.setCurrent(States.victory);
+            });
+
+            if (!player) {
+                if (this._delayedEnd <= 0) {
+                    if (this._HUD) {
+                        this._HUD.dispose();
+                        this._HUD = null;
+                    }
+                    playService.broadcastGameEnd({ result: "defeat" });
+                    State.setCurrent(States.dead);
+                }
+                this._delayedEnd -= deltaTime;
             }
-            this._delayedEnd -= deltaTime;
+            else if (!enemyCount) {
+                if (this._delayedEnd <= 0) {
+                    States.victory.ship = player;
+                    if (this._HUD) {
+                        this._HUD.dispose();
+                        this._HUD = null;
+                    }
+                    playService.broadcastGameEnd({ result: "victory" });
+                    State.setCurrent(States.victory);
+                }
+                this._delayedEnd -= deltaTime;
+            }
         }
     }
 

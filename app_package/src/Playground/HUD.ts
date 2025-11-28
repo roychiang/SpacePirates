@@ -1,5 +1,5 @@
-import { AdvancedDynamicTexture, Control, StackPanel, TextBlock, Slider, Image, InputText, Checkbox, Button, Rectangle, Grid } from "@babylonjs/gui";
-import { Vector3, Vector4, Engine, Camera, Nullable, Scene, Color3, ThinEngine, InputBlock } from "@babylonjs/core";
+import { AdvancedDynamicTexture, Control, StackPanel, TextBlock, Slider, Image, InputText, Checkbox, Button, Rectangle, Grid, Ellipse } from "@babylonjs/gui";
+import { Vector3, Vector4, Engine, Camera, Nullable, Scene, Color3, ThinEngine, InputBlock, Matrix, Quaternion } from "@babylonjs/core";
 import { ShipManager, Ship } from './Ship';
 import { Parameters } from './Parameters';
 import { InputManager } from './Inputs/Input';
@@ -295,6 +295,8 @@ export class HUD {
     private _touchInput : Nullable<TouchInput> = null;
     private _aiCounter : Rectangle;
     private _aiCounterGrid : Grid;
+    private _radarPanel: Ellipse;
+    private _radarDots: Array<Ellipse> = [];
     constructor(shipManager : ShipManager, assets: Assets, scene: Scene, players: Array<Ship>) {
         console.log(JSON.stringify(Object.getOwnPropertyNames(Parameters)));
         this._shipManager = shipManager;
@@ -420,6 +422,41 @@ export class HUD {
         this._parameters.isVisible = !InputManager.isTouch;
         this._adt.addControl(this._parameters);
 
+        // Radar
+        this._radarPanel = new Ellipse();
+        this._radarPanel.width = "150px";
+        this._radarPanel.height = "150px";
+        this._radarPanel.color = "white";
+        this._radarPanel.thickness = 2;
+        this._radarPanel.background = "#00000088";
+        this._radarPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        this._radarPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        this._radarPanel.top = "20px";
+        this._radarPanel.left = "20px";
+        this._adt.addControl(this._radarPanel);
+
+        // Center dot (Self)
+        const selfDot = new Ellipse();
+        selfDot.width = "4px";
+        selfDot.height = "4px";
+        selfDot.color = "white";
+        selfDot.background = "white";
+        selfDot.thickness = 0;
+        this._radarPanel.addControl(selfDot);
+
+        // Dot pool
+        this._radarDots = [];
+        for (let i = 0; i < 50; i++) {
+            const dot = new Ellipse();
+            dot.width = "4px";
+            dot.height = "4px";
+            dot.color = "white";
+            dot.thickness = 0;
+            dot.isVisible = false;
+            this._radarPanel.addControl(dot);
+            this._radarDots.push(dot);
+        }
+
         if (InputManager.isTouch) {
             this._touchInput = new TouchInput(this._adt, this._shipManager);
         }
@@ -436,15 +473,20 @@ export class HUD {
         this._parameters.isVisible = Settings.showParameters;
         let enemyCount = 0, allyCount = 0;
         
+        // Determine local player's faction
+        const localShip = players[0];
+        const localFaction = localShip ? localShip.faction : 0;
+
         this._hudPanels.forEach((hudPanel, index) => {
             hudPanel.tick(engine, players[index], this._shipManager);
         });
 
         this._shipManager.ships.forEach((ship, shipIndex) => {
             if (ship.isValid()) {
-                if (ship.faction == 1) {
+                if (ship.faction !== localFaction) {
                     enemyCount++;
-                } else if (!ship.isHuman) {
+                } else if (ship !== localShip) {
+                    // Count allies (excluding self)
                     allyCount++;
                 }
                 if (Parameters.AIDebugLabels) {
@@ -469,6 +511,50 @@ export class HUD {
 
         if (this._touchInput) {
             this._touchInput.tick();
+        }
+
+        // Radar update
+        const radarRange = 400; 
+        const radarRadius = 75;
+        
+        this._radarDots.forEach(d => d.isVisible = false);
+
+        if (false && localShip && localShip.isValid()) {
+            this._radarPanel.isVisible = true;
+            const rot = localShip.root.rotationQuaternion;
+            const invertRot = rot ? Quaternion.Inverse(rot!) : Quaternion.Identity();
+            const matrix = Matrix.Identity();
+            invertRot.toRotationMatrix(matrix);
+
+            let dotIndex = 0;
+            this._shipManager.ships.forEach(ship => {
+                if (ship.isValid() && ship !== localShip && dotIndex < this._radarDots.length) {
+                    const relativePos = ship.root.position.subtract(localShip.root.position);
+                    const transformed = Vector3.TransformCoordinates(relativePos, matrix);
+                    
+                    const dist = transformed.length();
+                    if (dist < radarRange) {
+                        const dot = this._radarDots[dotIndex];
+                        
+                        const x = transformed.x / radarRange * radarRadius;
+                        const y = -transformed.z / radarRange * radarRadius;
+
+                        dot.left = `${x}px`;
+                        dot.top = `${y}px`;
+                        
+                        if (ship.faction === localFaction) {
+                            dot.background = "#4f73ff"; // Blue
+                        } else {
+                            dot.background = "#ff4f4f"; // Red
+                        }
+                        
+                        dot.isVisible = true;
+                        dotIndex++;
+                    }
+                }
+            });
+        } else {
+            this._radarPanel.isVisible = false;
         }
     }
 
