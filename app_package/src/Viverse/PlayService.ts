@@ -250,7 +250,7 @@ export class PlayService {
     this.colyseusRoom?.send("gameState", payload);
   }
 
-  broadcastGameEnd(payload: { result: "victory" | "defeat" }) {
+  broadcastGameEnd(payload: { result?: "victory" | "defeat", winnerFaction?: number }) {
     this.colyseusRoom?.send("gameEnd", payload);
   }
 

@@ -220,7 +220,7 @@ export class Ship extends Agent {
 
         Ship.HandleThrustersShield(this._assets, this, this.shipMesh, isValkyrie, 0, this._glowLayer);
 
-        this.availableMissiles = isValkyrie ? 8 : 0;
+        this.availableMissiles = (isValkyrie || isHuman) ? 8 : 0;
         this.tickEnabled();
     }
 
@@ -559,7 +559,7 @@ export class ShipManager {
     public setShipState(index: number, life: number, position: { x: number, y: number, z: number }, rotation: { x: number, y: number, z: number, w: number }) {
         if (index >= 0 && index < this.ships.length) {
             const ship = this.ships[index];
-            if (ship.isValid()) {
+            if (ship) {
                 ship.life = life;
                 // Only sync position/rotation for remote ships (not the local player's ship if they are controlling it)
                 // We assume controlIndex matches ship index for human players, but we need to check if this ship is controlled by local player.

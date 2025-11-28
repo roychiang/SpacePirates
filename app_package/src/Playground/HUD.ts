@@ -8,6 +8,7 @@ import { Settings } from "../Settings";
 import { GamepadInput } from "./Inputs/GamepadInput";
 import { Assets } from "./Assets";
 import { GuiFramework } from "./GuiFramework";
+import { playService } from "../Viverse/Viverse";
 
 class HUDPanel {
     // private _bars: StackPanel;
@@ -20,7 +21,7 @@ class HUDPanel {
     private _healthIcon : Image;
     private _speedIcon : Image;
     private _reloadIcon : Image;
-    private _targets = new Array<Image>();
+    private _targets = new Array<TextBlock>();
     private _targetLock: Image;
     private _divisor: number;
     private _index: number;
@@ -39,15 +40,18 @@ class HUDPanel {
         this._fpsCounter.top = "0px";
         this._fpsCounter.left = "0px";
         adt.addControl(this._fpsCounter);
-*/
+        */
         for(let i = 0; i < 20; i++) {
-            var image = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/trackerIcon.svg"));
-            image.height = "32px";
-            image.width = "32px";
-            image.isVisible = false;
-            adt.addControl(image);
-            this._targets.push(image);
-            image.alpha = 0.4;
+            var text = new TextBlock();
+            text.text = "▲";
+            text.fontSize = "24px";
+            text.color = "white";
+            text.width = "32px";
+            text.height = "32px";
+            text.isVisible = false;
+            adt.addControl(text);
+            this._targets.push(text);
+            text.alpha = 0.4;
         }
 
         this._targetLock = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/missileLockIcon.svg"));
@@ -184,9 +188,10 @@ class HUDPanel {
 
         let targetIndex = 0;
         shipManager.ships.forEach((ship) => {
-            if (ship.isValid() && ship != player && ship.faction != player.faction) {
+            if (ship.isValid() && ship != player) {
                 if (targetIndex < this._targets.length) {
                     const img = this._targets[targetIndex];
+                    img.color = (ship.faction === player.faction) ? "#4f73ff" : "#ff4f4f";
                     this._computeScreenCoord(engine, player.shipCamera!.getFreeCamera(), ship.root.position, img);
                     targetIndex++;
                 }
@@ -234,8 +239,8 @@ class HUDPanel {
     }
 
     
-    private _computeScreenCoord(engine: Engine, camera: Camera, position: Vector3, image: Image | undefined, centerInterpolate: number = 1): void {
-        if (!image) {
+    private _computeScreenCoord(engine: Engine, camera: Camera, position: Vector3, control: Control | undefined, centerInterpolate: number = 1): void {
+        if (!control) {
             return;
         }
         const w = (engine.getRenderWidth() * 0.5);
@@ -248,38 +253,33 @@ class HUDPanel {
         spo1.y /= spo1.w;
         var l = spo1.x * w * centerInterpolate;
         var t = -spo1.y * h * centerInterpolate;
-        var visible = spo1.z < 0;
         
-        if (visible && spo1.z < 0)
-        {
-            t *= -1000;
-            l *= -1000;
+        // If behind camera
+        if (spo1.z < 0) {
+            control.isVisible = false;
+            return;
         }
 
-        if (l < -w) {
-            l = -w + 0.05 * w;
-            visible = true;
-        }
-        else if (l > w) {
-            l = w - 0.05 * w;
-            visible = true;
-        }
-
-        if (t < -h) {
-            t = -h + 0.1 * h;
-            visible = true;
-        }
-        else if (t > h) {
-            t = h - 0.1 * h;
-            visible = true;
+        // Clamp to screen edges (Margin 20px)
+        let clamped = false;
+        // Only clamp if not interpolating (i.e. not target lock)
+        // Actually target lock (centerInterpolate < 1) shouldn't clamp? 
+        // But target lock calls this with centerInterpolate.
+        // The arrows call with default 1.
+        if (centerInterpolate === 1) {
+            if (l < -w + 20) { l = -w + 20; clamped = true; }
+            else if (l > w - 20) { l = w - 20; clamped = true; }
+            
+            if (t < -h + 20) { t = -h + 20; clamped = true; }
+            else if (t > h - 20) { t = h - 20; clamped = true; }
         }
 
         l /= this._divisor;
         l += (this._index * this._divisor - Math.floor(this._divisor / 2)) * w / this._divisor;
-        image.left = l;
-        image.top = t;
-        image.rotation = Math.atan2(spo1.x, spo1.y) + ((spo1.z < 0) ? Math.PI : 0);
-        image.isVisible = visible;
+        control.left = l;
+        control.top = t;
+        control.rotation = Math.atan2(spo1.x, spo1.y) + ((spo1.z < 0) ? Math.PI : 0);
+        control.isVisible = true;
     }
 }
 
@@ -297,6 +297,8 @@ export class HUD {
     private _aiCounterGrid : Grid;
     private _radarPanel: Ellipse;
     private _radarDots: Array<Ellipse> = [];
+    private _playerLabels: Map<number, TextBlock> = new Map();
+
     constructor(shipManager : ShipManager, assets: Assets, scene: Scene, players: Array<Ship>) {
         console.log(JSON.stringify(Object.getOwnPropertyNames(Parameters)));
         this._shipManager = shipManager;
@@ -472,6 +474,7 @@ export class HUD {
     tick(engine: Engine, gameSpeed: number, players: Array<Ship>) {
         this._parameters.isVisible = Settings.showParameters;
         let enemyCount = 0, allyCount = 0;
+        const actors = playService.getRoom()?.actors || [];
         
         // Determine local player's faction
         const localShip = players[0];
@@ -485,15 +488,56 @@ export class HUD {
             if (ship.isValid()) {
                 if (ship.faction !== localFaction) {
                     enemyCount++;
-                } else if (ship !== localShip) {
-                    // Count allies (excluding self)
+                } else {
+                    // Count allies (including self)
                     allyCount++;
                 }
+
+                // Update Player Labels
+                if (ship.isHuman && ship !== localShip) {
+                    let label = this._playerLabels.get(shipIndex);
+                    if (!label) {
+                        label = new TextBlock();
+                        label.fontSize = "14px";
+                        label.fontWeight = "bold";
+                        label.outlineColor = "black";
+                        label.outlineWidth = 2;
+                        this._adt.addControl(label);
+                        this._playerLabels.set(shipIndex, label);
+                    }
+
+                    // Get player name
+                    let name = "PLAYER";
+                    if (shipIndex < actors.length) {
+                         const props = actors[shipIndex].properties;
+                         const displayName = props ? props.displayName : undefined;
+                         if (displayName) {
+                             name = String(displayName);
+                         } else {
+                             name = actors[shipIndex].name || "PLAYER";
+                         }
+                    }
+                    label.text = name;
+
+                    if (localShip && localShip.shipCamera) {
+                        this._computeScreenCoord(engine, localShip.shipCamera.getFreeCamera(), ship.root.position, label);
+                        label.color = (ship.faction === localFaction) ? "#4f73ff" : "#ff4f4f";
+                    } else {
+                        label.isVisible = false;
+                    }
+                } else {
+                    const label = this._playerLabels.get(shipIndex);
+                    if (label) label.isVisible = false;
+                }
+
                 if (Parameters.AIDebugLabels) {
                     const movement = `${ship.input.burst ? 'bursting' : ''}${ship.input.breaking ? 'breaking' : ''}`;
                     ship.debugLabel!.text = `${ship.state}\nidx: ${shipIndex} tgt: ${ship.bestPrey}\n${movement}`;
                     ship.debugLabel!.isVisible = Parameters.AIDebugLabels;
                 }
+            } else {
+                const label = this._playerLabels.get(shipIndex);
+                if (label) label.isVisible = false;
             }
         });
 
@@ -622,5 +666,36 @@ export class HUD {
     dispose() {
         this._adt.dispose();
         window.removeEventListener("resize", this._resizeListener);
+    }
+
+    private _computeScreenCoord(engine: Engine, camera: Camera, position: Vector3, control: Control): void {
+        const w = (engine.getRenderWidth() * 0.5);
+        const h = engine.getRenderHeight() * 0.5;
+
+        var spo0 = Vector4.TransformCoordinates(position, camera.getViewMatrix());
+        var spo1 = Vector4.TransformCoordinates(new Vector3(spo0.x, spo0.y, spo0.z), camera.getProjectionMatrix());
+
+        spo1.x /= spo1.w;
+        spo1.y /= spo1.w;
+        var l = spo1.x * w;
+        var t = -spo1.y * h;
+        
+        // If behind camera
+        if (spo1.z < 0) {
+            control.isVisible = false;
+            return;
+        }
+
+        // Clamp to screen edges (Margin 20px)
+        let clamped = false;
+        if (l < -w + 20) { l = -w + 20; clamped = true; }
+        else if (l > w - 20) { l = w - 20; clamped = true; }
+        
+        if (t < -h + 20) { t = -h + 20; clamped = true; }
+        else if (t > h - 20) { t = h - 20; clamped = true; }
+
+        control.left = l;
+        control.top = t;
+        control.isVisible = true;
     }
 }
