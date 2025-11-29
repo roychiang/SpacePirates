@@ -6,6 +6,7 @@ import { InputManager } from "../Inputs/Input";
 import { Nullable } from "@babylonjs/core";
 import { Ship, Statistics } from "../Ship";
 import { GuiFramework } from "../GuiFramework";
+import { playService } from "../../Viverse/Viverse";
 
 export class Victory extends State {
     public ship: Nullable<Ship> = null;
@@ -57,10 +58,12 @@ export class Victory extends State {
                 GuiFramework.createParameter(statsGrid, "Enemies Asteroid Crash", GuiFramework.createStatText(Statistics.enemiesCrash as unknown as string));
             }
     
-            GuiFramework.addButton("Next Battle", panel).onPointerDownObservable.add(function(info) {
-                GameState.gameSession?.stop();
-                State.setCurrent(States.gameState);
-            });
+            if (!playService.getRoom()) {
+                GuiFramework.addButton("Next Battle", panel).onPointerDownObservable.add(function(info) {
+                    GameState.gameSession?.stop();
+                    State.setCurrent(States.gameState);
+                });
+            }
     
             GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
                 GameState.gameSession?.stop();
@@ -107,10 +110,12 @@ export class Victory extends State {
                 GuiFramework.createParameter(statsGrid, "Enemies Asteroid Crash", GuiFramework.createStatText(Statistics.enemiesCrash as unknown as string));
             }
     
-            GuiFramework.addButton("Next Battle", panel).onPointerDownObservable.add(function(info) {
-                GameState.gameSession?.stop();
-                State.setCurrent(States.gameState);
-            });
+            if (!playService.getRoom()) {
+                GuiFramework.addButton("Next Battle", panel).onPointerDownObservable.add(function(info) {
+                    GameState.gameSession?.stop();
+                    State.setCurrent(States.gameState);
+                });
+            }
     
             GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
                 GameState.gameSession?.stop();

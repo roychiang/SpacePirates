@@ -41,17 +41,15 @@ class HUDPanel {
         this._fpsCounter.left = "0px";
         adt.addControl(this._fpsCounter);
         */
-        for(let i = 0; i < 20; i++) {
-            var text = new TextBlock();
-            text.text = "▲";
-            text.fontSize = "24px";
-            text.color = "white";
-            text.width = "32px";
-            text.height = "32px";
-            text.isVisible = false;
-            adt.addControl(text);
-            this._targets.push(text);
-            text.alpha = 0.4;
+        this._targets = [];
+        for (let i = 0; i < 30; i++) {
+            const img = new Image("target", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/target.svg"));
+            img.widthInPixels = 40;
+            img.heightInPixels = 40;
+            img.isVisible = false;
+            img.isHitTestVisible = false; // Crucial: Prevent blocking input
+            adt.addControl(img);
+            this._targets.push(img as any);
         }
 
         this._targetLock = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/missileLockIcon.svg"));
@@ -60,6 +58,7 @@ class HUDPanel {
         this._targetLock.sourceWidth = 256;
         this._targetLock.sourceLeft = 0;
         this._targetLock.isVisible = false;
+        this._targetLock.isHitTestVisible = false;
         adt.addControl(this._targetLock);
 
         // this._bars = new StackPanel("bars");
@@ -184,6 +183,7 @@ class HUDPanel {
         // hide every image
         this._targets.forEach(image => {
             image.isVisible = false;
+            image.isHitTestVisible = false; // Ensure target indicators don't block input
         });
 
         let targetIndex = 0;
@@ -462,6 +462,27 @@ export class HUD {
         if (InputManager.isTouch) {
             this._touchInput = new TouchInput(this._adt, this._shipManager);
         }
+
+        // Mute button (Upper Right)
+            const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
+            muteBtn.width = "60px";
+            muteBtn.height = "60px";
+            muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+            muteBtn.left = "-20px";
+            muteBtn.top = "20px";
+            if (playService.voiceManager.isMuted()) {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+            }
+            muteBtn.onPointerClickObservable.add(() => {
+                 const isMuted = playService.voiceManager.toggleMute();
+                 if (isMuted) {
+                     muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+                 } else {
+                     muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
+                 }
+            });
+            this._adt.addControl(muteBtn);
     }
 
     private _resizeListener() {
@@ -502,6 +523,7 @@ export class HUD {
                         label.fontWeight = "bold";
                         label.outlineColor = "black";
                         label.outlineWidth = 2;
+                        label.isHitTestVisible = false;
                         this._adt.addControl(label);
                         this._playerLabels.set(shipIndex, label);
                     }
@@ -561,10 +583,11 @@ export class HUD {
         const radarRange = 400; 
         const radarRadius = 75;
         
-        this._radarDots.forEach(d => d.isVisible = false);
+        this._radarDots.forEach(d => { d.isVisible = false; d.isHitTestVisible = false; }); // Ensure radar dots don't block input
 
-        if (false && localShip && localShip.isValid()) {
-            this._radarPanel.isVisible = true;
+        if (localShip && localShip.isValid()) {
+            this._radarPanel.isVisible = false; // Hide Radar per user request
+            this._radarPanel.isHitTestVisible = false; // Ensure radar panel don't block input
             const rot = localShip.root.rotationQuaternion;
             const invertRot = rot ? Quaternion.Inverse(rot!) : Quaternion.Identity();
             const matrix = Matrix.Identity();

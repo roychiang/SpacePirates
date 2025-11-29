@@ -3,6 +3,7 @@ import { Parameters } from "../Parameters"
 import { State } from "./State"
 import { States } from "./States"
 import { GuiFramework } from "../GuiFramework"
+import { Assets } from "../Assets"
 import { avatarService } from "../../Viverse/Viverse"
 import { authService } from "../../Viverse/Viverse"
 import { playService } from "../../Viverse/Viverse"
@@ -156,8 +157,11 @@ export class Matchmaking extends State {
       await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
       const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
       const target = (this.listedRooms || []).find(r => r.id === rid)
-      if (target && Array.isArray(target.actors) && target.actors.length >= (target.max_players || 2)) {
-        console.log("[UI] join blocked: room full", { id: rid, count: target.actors.length })
+      if (target && (
+          (Array.isArray(target.actors) && target.actors.length >= (target.max_players || 2)) ||
+          (target.properties && (target.properties.playing || target.properties.game_started))
+         )) {
+        console.log("[UI] join blocked: room full or playing", { id: rid })
         return
       }
       const res = await playService.joinRoom(rid || "room")
@@ -172,6 +176,27 @@ export class Matchmaking extends State {
     cancelBtn.onPointerDownObservable.add(() => {
       State.setCurrent(States.main)
     })
+    // Mute button (Upper Right)
+        const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
+        muteBtn.width = "60px";
+        muteBtn.height = "60px";
+        muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        muteBtn.left = "-20px";
+        muteBtn.top = "20px";
+        if (playService.voiceManager.isMuted()) {
+             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+        }
+        muteBtn.onPointerClickObservable.add(() => {
+             const isMuted = playService.voiceManager.toggleMute();
+             if (isMuted) {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+             } else {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
+             }
+        });
+        this._adt.addControl(muteBtn);
+
     this._adt.addControl(root)
     this.loadStatus()
     // Removed polling timer - we get real-time updates from onRoomListUpdate event
@@ -240,15 +265,21 @@ export class Matchmaking extends State {
     if (!this.roomsPanel) return
     this.roomsPanel.clearControls()
 
-    const memo: Record<string, boolean> = {}
-    const uniqueRooms: any[] = []
+    const roomMap = new Map<string, any>();
     for (const rr of filteredRooms) {
       const id = String(rr.id || "")
       if (!id) continue
-      if (memo[id]) continue
-      memo[id] = true
-      uniqueRooms.push(rr)
+      
+      const existing = roomMap.get(id);
+      const rActors = (rr.actors && Array.isArray(rr.actors)) ? rr.actors.length : 0;
+      const eActors = (existing && existing.actors && Array.isArray(existing.actors)) ? existing.actors.length : -1;
+
+      // Prioritize room with more actors (likely more up-to-date)
+      if (!existing || rActors > eActors) {
+        roomMap.set(id, rr);
+      }
     }
+    const uniqueRooms = Array.from(roomMap.values());
     const appId = playService.getAppId()
     const byOwner: Record<string, any> = {}
     for (const rr of uniqueRooms) {
@@ -270,7 +301,7 @@ export class Matchmaking extends State {
     const displayedRooms = ownerRooms.filter((rr: any) => {
       const sameApp = typeof rr.app_id === "string" ? (rr.app_id === appId) : false
       const sameGame = !!(rr.properties && rr.properties["gameId"] === "SpacePirates")
-      return !rr.is_closed && (sameApp || sameGame)
+      return (sameApp || sameGame)
     })
       .sort((a: any, b: any) => String(a.name || a.id).localeCompare(String(b.name || b.id)))
     for (const r of displayedRooms) {
@@ -286,7 +317,9 @@ export class Matchmaking extends State {
       container.background = (this.selectedRoomId === r.id) ? "#2a3f4d" : "#1a2a33"
       container.height = "60px"
       const actorList = (r.actors || [])
-      const canJoinRow = !r.is_closed && actorList.length < (r.max_players || 2)
+      console.log("[UI] Room row:", { id: r.id, actors: actorList.length, playing: r.properties?.playing, started: r.properties?.game_started })
+      // Enforce 2-player limit for UI status, regardless of server max_players (which might include AI slots)
+      const canJoinRow = !r.is_closed && actorList.length < 2 && !(r.properties && (r.properties.playing || r.properties.game_started))
       row.addControl(container, 0, 0)
       const cb = new Checkbox()
       cb.isChecked = this.selectedRoomId === r.id
@@ -345,9 +378,20 @@ export class Matchmaking extends State {
       const canJoin = canJoinRow
       const status = new TextBlock()
       GuiFramework.setFont(status, true, true)
-      status.color = canJoin ? "#2ecc71" : "#e74c3c"
+      
+      let statusText = "Available";
+      // Check if playing (locked or custom property)
+      const isPlaying = r.properties && (r.properties.playing || r.properties.game_started);
+      
+      if (isPlaying) {
+          statusText = "Playing";
+      } else if (actorList.length >= 2 || r.is_closed) {
+          statusText = "Full";
+      }
+
+      status.color = (statusText === "Available") ? "#2ecc71" : "#e74c3c"
       status.fontSize = 18
-      status.text = canJoin ? "Join" : "Full"
+      status.text = statusText
       status.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
       status.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
       row.addControl(status, 0, 3)
@@ -359,7 +403,9 @@ export class Matchmaking extends State {
   private updateJoinButtonState() {
     const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
     const target = (this.listedRooms || []).find(r => r.id === rid)
-    const canJoin = !!target && !target.is_closed && ((target.actors || []).length < (target.max_players || 2))
+    const canJoin = !!target && !target.is_closed && 
+                    ((target.actors || []).length < 2) && 
+                    !(target.properties && (target.properties.playing || target.properties.game_started))
     if (this.joinBtn) this.joinBtn.isEnabled = canJoin
   }
 

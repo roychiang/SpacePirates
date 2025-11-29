@@ -20,11 +20,19 @@ export class GameState extends Schema {
 
 export class GameRoom extends Room<GameState> {
     maxClients = 4;
+    customMaxPlayers = 4;
 
     onCreate(options: any) {
         this.setState(new GameState());
 
         console.log("GameRoom created with options:", options);
+
+        // Store maxPlayers but keep maxClients high to prevent auto-lock hiding room
+        if (options.maxPlayers) {
+            this.customMaxPlayers = options.maxPlayers;
+        } else if (options.maxClients) {
+            this.customMaxPlayers = options.maxClients;
+        }
 
         // Set room metadata for listing (includes game_mode for PVP/Co-op filtering)
         const metadata: any = {
@@ -85,13 +93,21 @@ export class GameRoom extends Room<GameState> {
         // Handle room properties update
         this.onMessage("updateRoomProperties", (client, message) => {
             console.log("Updating room properties:", message);
+            const newMetadata: any = { ...this.metadata };
             for (const key in message) {
                 this.state.properties.set(key, String(message[key]));
+                newMetadata[key] = message[key];
             }
+            this.setMetadata(newMetadata);
         });
     }
 
     onJoin(client: Client, options: any) {
+        // Check custom limit
+        if (this.state.players.size >= this.customMaxPlayers) {
+            throw new Error("Room is full");
+        }
+
         console.log(client.sessionId, "joined!");
         const player = new Player();
         player.sessionId = client.sessionId;
@@ -100,11 +116,17 @@ export class GameRoom extends Room<GameState> {
         player.displayName = options.displayName || options.name || "Player";
         player.joinOrder = this.state.players.size; // Assign join order based on current player count
         this.state.players.set(client.sessionId, player);
+        
+        // Update metadata with player count
+        this.setMetadata({ ...this.metadata, playerCount: this.state.players.size });
     }
 
     onLeave(client: Client, consented: boolean) {
         console.log(client.sessionId, "left!");
         this.state.players.delete(client.sessionId);
+        
+        // Update metadata with player count
+        this.setMetadata({ ...this.metadata, playerCount: this.state.players.size });
     }
 
     onDispose() {

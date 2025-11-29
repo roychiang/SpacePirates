@@ -8,6 +8,7 @@ import { State } from "./State";
 import { States } from "./States";
 import { Assets } from "../Assets";
 import { GuiFramework } from "../GuiFramework";
+import { playService } from "../../Viverse/Viverse";
 
 export class Main extends State {
 
@@ -84,15 +85,15 @@ export class Main extends State {
                 });
             }
 
-            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function (info) {
+            GuiFramework.addButton("CO-OP", panel).onPointerDownObservable.add(function (info) {
                 States.matchmaking.pvpMode = false;
                 State.setCurrent(States.matchmaking);
             });
 
-            GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
-                States.matchmaking.pvpMode = true;
-                State.setCurrent(States.matchmaking);
-            });
+            // GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
+            //     States.matchmaking.pvpMode = true;
+            //     State.setCurrent(States.matchmaking);
+            // });
 
             GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
                 States.options.backDestination = States.main;
@@ -156,15 +157,15 @@ export class Main extends State {
                 });
             }
 
-            GuiFramework.addButton("Online Co-op", panel).onPointerDownObservable.add(function (info) {
+            GuiFramework.addButton("CO-OP", panel).onPointerDownObservable.add(function (info) {
                 States.matchmaking.pvpMode = false;
                 State.setCurrent(States.matchmaking);
             });
 
-            GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
-                States.matchmaking.pvpMode = true;
-                State.setCurrent(States.matchmaking);
-            });
+            // GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
+            //     States.matchmaking.pvpMode = true;
+            //     State.setCurrent(States.matchmaking);
+            // });
 
             GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
                 States.options.backDestination = States.main;
@@ -176,6 +177,28 @@ export class Main extends State {
             });
             this._adt.addControl(panel);
         }
+
+        // Mute button (Upper Right)
+        const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
+        muteBtn.width = "60px";
+        muteBtn.height = "60px";
+        muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        muteBtn.left = "-20px";
+        muteBtn.top = "20px";
+        // Set initial state
+        if (playService.voiceManager.isMuted()) {
+             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+        }
+        muteBtn.onPointerClickObservable.add(() => {
+             const isMuted = playService.voiceManager.toggleMute();
+             if (isMuted) {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+             } else {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
+             }
+        });
+        this._adt.addControl(muteBtn);
 
     }
 }

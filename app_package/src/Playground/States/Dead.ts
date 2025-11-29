@@ -6,6 +6,7 @@ import { Nullable } from "@babylonjs/core";
 import { Ship, Statistics } from "../Ship";
 import { InputManager } from "../Inputs/Input";
 import { GuiFramework } from "../GuiFramework";
+import { playService } from "../../Viverse/Viverse";
 
 export class Dead extends State {
     public ship: Nullable<Ship> = null;
@@ -57,10 +58,12 @@ export class Dead extends State {
                 GuiFramework.createParameter(statsGrid, "Enemies Asteroid Crash", GuiFramework.createStatText(Statistics.enemiesCrash as unknown as string));
             }
 
-            GuiFramework.addButton("Try again", panel).onPointerDownObservable.add(function(info) {
-                GameState.gameSession?.stop();
-                State.setCurrent(States.gameState);
-            });
+            if (!playService.getRoom()) {
+                GuiFramework.addButton("Try again", panel).onPointerDownObservable.add(function(info) {
+                    GameState.gameSession?.stop();
+                    State.setCurrent(States.gameState);
+                });
+            }
 
             GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
                 GameState.gameSession?.stop();
@@ -108,10 +111,12 @@ export class Dead extends State {
                 GuiFramework.createParameter(statsGrid, "Enemies Asteroid Crash", GuiFramework.createStatText(Statistics.enemiesCrash as unknown as string));
             }
 
-            GuiFramework.addButton("Try again", panel).onPointerDownObservable.add(function(info) {
-                GameState.gameSession?.stop();
-                State.setCurrent(States.gameState);
-            });
+            if (!playService.getRoom()) {
+                GuiFramework.addButton("Try again", panel).onPointerDownObservable.add(function(info) {
+                    GameState.gameSession?.stop();
+                    State.setCurrent(States.gameState);
+                });
+            }
 
             GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
                 GameState.gameSession?.stop();

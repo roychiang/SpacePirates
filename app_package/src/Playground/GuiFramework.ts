@@ -488,6 +488,12 @@ export class GuiFramework {
         return button;
     }
 
+    public static createImageButton(name: string, imageUrl: string): Button {
+        var button = Button.CreateImageButton(name, "", imageUrl);
+        button.thickness = 0;
+        return button;
+    }
+
     public static formatButtonGrid(grid: Grid) {
         grid.addRowDefinition(1.0, false);
         grid.addRowDefinition(140, true);

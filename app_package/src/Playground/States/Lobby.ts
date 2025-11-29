@@ -2,6 +2,7 @@ import { Control, Grid, StackPanel, Button, TextBlock, Rectangle, Ellipse, Image
 import { State } from "./State"
 import { States } from "./States"
 import { GuiFramework } from "../GuiFramework"
+import { Assets } from "../Assets"
 import { playService } from "../../Viverse/Viverse"
 import { GameDefinition } from "../Game"
 import { GameState } from "./GameState"
@@ -53,6 +54,28 @@ export class Lobby extends State {
       this.tryStart()
     })
     this._adt.addControl(root)
+
+    // Mute button (Upper Right)
+        const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
+        muteBtn.width = "60px";
+        muteBtn.height = "60px";
+        muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        muteBtn.left = "-20px";
+        muteBtn.top = "20px";
+        if (playService.voiceManager.isMuted()) {
+             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+        }
+        muteBtn.onPointerClickObservable.add(() => {
+             const isMuted = playService.voiceManager.toggleMute();
+             if (isMuted) {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+             } else {
+                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
+             }
+        });
+        this._adt.addControl(muteBtn);
+
     playService.ensureActorPresentInRoom().then(() => this.refresh())
       ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
       ; (playService as any).off?.("actorJoined", this.onActorJoined)
@@ -214,11 +237,17 @@ export class Lobby extends State {
     } else {
       def.humanAllies = count
       def.humanEnemies = 0
-      console.log("[Lobby] Co-op mode: humanAllies=" + count)
+      // Ensure total allies = 4 (Humans + AI)
+      def.aiAllies = Math.max(0, 4 - count)
+      console.log("[Lobby] Co-op mode: humanAllies=" + count + ", aiAllies=" + def.aiAllies)
     }
 
     def.aiEnemies = Parameters.enemyCount
-    def.aiAllies = Parameters.allyCount
+    if (gameMode === "pvp") {
+       def.aiAllies = Parameters.allyCount // Use default parameter for PvP (usually 0 or low)
+    }
+    // For Co-op, aiAllies is already set above dynamically.
+    
     GameState.gameDefinition = def
     console.log("[Lobby] GameDefinition created:", def);
 
@@ -245,7 +274,7 @@ export class Lobby extends State {
       }
 
       // Save config and start game
-      await playService.updateRoomProperties({ ai_config: JSON.stringify(aiConfig), game_started: true });
+      await playService.updateRoomProperties({ ai_config: JSON.stringify(aiConfig), game_started: true, playing: true });
     }
 
     playService.startMultiplayer().then(() => {

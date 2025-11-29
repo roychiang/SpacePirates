@@ -1,6 +1,7 @@
 import * as Colyseus from "colyseus.js";
 import { getViverse } from "./Viverse";
 import { Config } from "../Config";
+import { VoiceManager } from "./VoiceManager";
 
 export type Actor = {
   session_id: string
@@ -36,6 +37,7 @@ export class PlayService {
 
   private client?: Colyseus.Client
   private colyseusRoom?: Colyseus.Room
+  public voiceManager: VoiceManager = new VoiceManager();
 
   // Default to local dev, user should update this for prod
   private endpoint = Config.getColyseusEndpoint();
@@ -147,6 +149,12 @@ export class PlayService {
       };
 
       this.emit("roomUpdated", this.room);
+
+      // Initialize Voice Peer
+      if (this.colyseusRoom) {
+          await this.voiceManager.initialize(this.colyseusRoom.sessionId);
+      }
+
       return { success: true, room: this.room };
     } catch (e) {
       console.error("createRoom error", e);
@@ -206,6 +214,12 @@ export class PlayService {
       };
 
       this.emit("roomUpdated", this.room);
+
+      // Initialize Voice Peer
+      if (this.colyseusRoom) {
+          await this.voiceManager.initialize(this.colyseusRoom.sessionId);
+      }
+
       return { success: true, room: this.room };
     } catch (e) {
       console.error("joinRoom error", e);
@@ -214,6 +228,7 @@ export class PlayService {
   }
 
   async leaveRoom(): Promise<{ success: boolean; message?: string }> {
+    this.voiceManager.leave();
     if (this.colyseusRoom) {
       this.colyseusRoom.leave();
       this.colyseusRoom = undefined;
@@ -259,12 +274,18 @@ export class PlayService {
 
     try {
       const rooms = await (this.client as any).getAvailableRooms("game_room");
-      const mapped: Room[] = rooms.map((r: any) => ({
+      const mapped: Room[] = rooms.map((r: any) => {
+        let count = r.clients;
+        if (r.metadata && r.metadata.playerCount !== undefined && r.metadata.playerCount !== null) {
+            const pc = Number(r.metadata.playerCount);
+            if (!isNaN(pc)) count = pc;
+        }
+        return {
         id: r.roomId,
         app_id: this.appId,
         mode: "team",
         name: r.metadata?.name || ("Room " + r.roomId),
-        actors: new Array(r.clients).fill({} as Actor), // We don't know actors details from listing
+        actors: new Array(count).fill({} as Actor), // We don't know actors details from listing
         max_players: r.maxClients,
         min_players: 1,
         is_closed: r.locked,
@@ -272,7 +293,7 @@ export class PlayService {
         master_client_id: "",
         game_session: "",
         created_by_me: false
-      }));
+      }});
 
       return { success: true, rooms: mapped };
     } catch (e) {
@@ -335,6 +356,15 @@ export class PlayService {
         }
       });
     });
+
+    // Voice Chat: Connect to other peers
+    if (this.colyseusRoom) {
+        this.room.actors.forEach(actor => {
+            if (actor.session_id !== this.colyseusRoom!.sessionId) {
+                this.voiceManager.call(actor.session_id);
+            }
+        });
+    }
 
     // Sort by joinOrder to maintain join sequence (P1=0, P2=1, etc)
     this.room.actors = players.sort((a, b) => {
