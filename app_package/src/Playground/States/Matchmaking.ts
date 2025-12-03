@@ -24,8 +24,8 @@ export class Matchmaking extends State {
   public enter() {
     super.enter()
     if (!this._adt) return
-    authService.initClient({ clientId: "v48pybqy7f", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
-    playService.newMatchmakingClient("v48pybqy7f", true).then(() => {
+    authService.initClient({ clientId: "4p4wmv9d5z", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
+    playService.newMatchmakingClient("4p4wmv9d5z", true).then(() => {
       ; (playService as any).off?.("connected", this.onConnected)
         ; (playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
       playService.on("connected", this.onConnected)

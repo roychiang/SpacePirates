@@ -50,7 +50,7 @@ export class State {
                 GuiFramework.updateTopLeftAvatar(p?.name, url)
             }
             ;(async () => {
-                authService.initClient({ clientId: "v48pybqy7f", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
+                authService.initClient({ clientId: "4p4wmv9d5z", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
                 const attempt = async () => {
                     const ts = new Date().toISOString()
                     console.log("[Init] ts", ts)
