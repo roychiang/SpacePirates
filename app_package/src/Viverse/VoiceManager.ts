@@ -11,10 +11,17 @@ export class VoiceManager {
     constructor() {
     }
 
+    private _getPeerId(sessionId: string): string {
+        // PeerJS often has issues with IDs starting with special chars or containing non-alphanumeric chars depending on server.
+        // Colyseus IDs are URL-safe base64 (can contain '-' and '_').
+        // We prefix with 'v' and replace '-' with 'd' and '_' with 'u' to ensure a strictly alphanumeric ID.
+        return "v" + sessionId.replace(/-/g, "d").replace(/_/g, "u");
+    }
+
     public async initialize(userId: string): Promise<void> {
         if (this._peer) return;
 
-        this._myPeerId = userId;
+        this._myPeerId = this._getPeerId(userId);
 
         try {
             this._localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -46,14 +53,15 @@ export class VoiceManager {
     }
 
     public call(remotePeerId: string): void {
-        if (!this._peer || this._connections.has(remotePeerId)) return;
-        if (remotePeerId === this._myPeerId) return;
+        const targetId = this._getPeerId(remotePeerId);
+        if (!this._peer || this._connections.has(targetId)) return;
+        if (targetId === this._myPeerId) return;
 
-        console.log(`VoiceManager: Calling ${remotePeerId}...`);
+        console.log(`VoiceManager: Calling ${targetId} (orig: ${remotePeerId})...`);
         // We can call even if we don't have a stream (receive only mode?)
         // PeerJS documentation says we can pass undefined stream.
         const stream = this._localStream || new MediaStream();
-        const call = this._peer.call(remotePeerId, stream);
+        const call = this._peer.call(targetId, stream);
         this._handleCall(call);
     }
 
@@ -95,6 +103,17 @@ export class VoiceManager {
         if (audio) {
             audio.srcObject = null;
             audio.remove();
+        }
+    }
+
+    public closeConnection(peerId: string): void {
+        const targetId = this._getPeerId(peerId);
+        const conn = this._connections.get(targetId);
+        if (conn) {
+            console.log(`VoiceManager: Closing connection with ${targetId} (orig: ${peerId})`);
+            conn.close();
+            this._removeStream(targetId);
+            this._connections.delete(targetId);
         }
     }
 

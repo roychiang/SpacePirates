@@ -5,6 +5,7 @@ import { State } from "./State";
 import { States } from "./States";
 import { Parameters } from "../Parameters";
 import { GuiFramework } from "../GuiFramework";
+import { playService } from "../../Viverse/Viverse";
 
 export class InGameMenu extends State {
   public exit() {
@@ -58,8 +59,9 @@ export class InGameMenu extends State {
       }
   
       GuiFramework.addButton("Back to menu", panel).onPointerDownObservable.add(
-        function (info) {
+        async function (info) {
           GameState.gameSession?.stop();
+          await playService.leaveRoom();
           State.setCurrent(States.main);
         }
       );
@@ -104,8 +106,9 @@ export class InGameMenu extends State {
       }
   
       GuiFramework.addButton("Back to menu", panel).onPointerDownObservable.add(
-        function (info) {
+        async function (info) {
           GameState.gameSession?.stop();
+          await playService.leaveRoom();
           State.setCurrent(States.main);
         }
       );

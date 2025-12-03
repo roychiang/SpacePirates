@@ -224,6 +224,23 @@ export class Game {
             }
         }
 
+        // Listen for player leave events (for all clients including host)
+        playService.on("actorLeft", (p: any) => {
+            if (!p) return;
+            const joinOrder = parseInt(p.properties?.joinOrder || "-1");
+            console.log("[Game] Player left, index:", joinOrder);
+            
+            if (joinOrder >= 0 && joinOrder < this.humanPlayerShips.length) {
+                const ship = this.humanPlayerShips[joinOrder];
+                if (ship) {
+                    console.log("[Game] Removing ship for left player:", joinOrder);
+                    ship.life = -1; // Mark as dead/invalid
+                    ship.dispose(); // Remove visuals
+                    // We don't remove from array to keep indices stable
+                }
+            }
+        });
+
         if (this._localPlayerIndex !== 0) {
             // Client listens for dynamic spawns (if any future ones)
             playService.on("spawnEnemy", (p: any) => {

@@ -65,8 +65,9 @@ export class Dead extends State {
                 });
             }
 
-            GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(async function(info) {
                 GameState.gameSession?.stop();
+                await playService.leaveRoom();
                 State.setCurrent(States.main);
             });
 
@@ -118,8 +119,9 @@ export class Dead extends State {
                 });
             }
 
-            GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(function(info) {
+            GuiFramework.addButton("Main menu", panel).onPointerDownObservable.add(async function(info) {
                 GameState.gameSession?.stop();
+                await playService.leaveRoom();
                 State.setCurrent(States.main);
             });
 

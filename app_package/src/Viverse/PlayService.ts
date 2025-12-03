@@ -342,6 +342,23 @@ export class PlayService {
   private syncState(state: any) {
     if (!this.room) return;
 
+    // Detect left players
+    if (this.room.actors) {
+        const newSessionIds = new Set<string>();
+        state.players.forEach((p: any, sessionId: string) => {
+            newSessionIds.add(sessionId);
+        });
+        
+        this.room.actors.forEach(actor => {
+            if (!newSessionIds.has(actor.session_id)) {
+                console.log("[Play] Actor left:", actor);
+                this.emit("actorLeft", actor);
+                // Also close voice connection
+                this.voiceManager.closeConnection(actor.session_id);
+            }
+        });
+    }
+
     // Sync players
     const players: Actor[] = [];
     state.players.forEach((p: any, sessionId: string) => {
