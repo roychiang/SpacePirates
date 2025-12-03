@@ -18,6 +18,7 @@
     "webpack-dev-server": "^4.2.1"
   },
   "dependencies": {
-    "app_package": "file:../app_package"
+    "app_package": "file:../app_package",
+    "proving_ground": "file:.."
   }
 }

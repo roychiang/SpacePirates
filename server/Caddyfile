@@ -1,0 +1,11 @@
+{$SPACEPIRATES_DOMAIN} {
+    root * /srv/spacepirates
+    file_server
+    @ws {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @ws server:2567
+    reverse_proxy /colyseus server:2567
+}
+

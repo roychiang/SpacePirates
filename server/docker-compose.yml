@@ -2,6 +2,19 @@ version: '3'
 services:
   server:
     build: .
-    ports:
-      - "2567:2567"
+    expose:
+      - "2567"
     restart: always
+  caddy:
+    image: caddy:2
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SPACEPIRATES_DOMAIN=spacepirates.duckdns.org
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../docs:/srv/spacepirates:ro
+    depends_on:
+      - server
