@@ -1,6 +1,6 @@
 export class Config {
     // Replace this with your actual Hetzner IP or Domain
-    public static readonly PROD_ENDPOINT = "wss://colyseus.spacepirates.duckdns.org";
+    public static readonly PROD_ENDPOINT = "wss://spacepirates.app";
     public static readonly LOCAL_ENDPOINT = "ws://localhost:2567";
 
     public static getColyseusEndpoint(): string {
