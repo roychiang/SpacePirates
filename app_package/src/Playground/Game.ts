@@ -473,19 +473,19 @@ export class Game {
         } else {
             // Co-op Logic
             var enemyCount = 0;
-            var player: Nullable<Ship> = null;
+            var anyHumanAlive = false;
             this._shipManager.ships.forEach((ship, shipIndex) => {
                 if (ship.isValid()) {
                     if (ship.faction == 1) {
                         enemyCount++;
                     }
                     if (ship.isHuman) {
-                        player = ship;
+                        anyHumanAlive = true;
                     }
                 }
             });
 
-            if (!player) {
+            if (!anyHumanAlive) {
                 if (this._delayedEnd <= 0) {
                     if (this._HUD) {
                         this._HUD.dispose();
@@ -498,7 +498,9 @@ export class Game {
             }
             else if (!enemyCount) {
                 if (this._delayedEnd <= 0) {
-                    States.victory.ship = player;
+                    // Just pick the local player or first human for camera focus
+                    const winner = this.humanPlayerShips.find(s => s.isValid()) || this.humanPlayerShips[0];
+                    States.victory.ship = winner;
                     if (this._HUD) {
                         this._HUD.dispose();
                         this._HUD = null;

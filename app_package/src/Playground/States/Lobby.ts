@@ -177,10 +177,11 @@ export class Lobby extends State {
       cell.thickness = 0
       cell.cornerRadius = 22
       cell.background = "#1b2b33"
-      const img = new Image("", (a.properties && typeof a.properties["headIconUrl"] === "string") ? String(a.properties["headIconUrl"]) : "")
+      const url = (a.properties && typeof a.properties["headIconUrl"] === "string") ? String(a.properties["headIconUrl"]) : ((a as any).headIconUrl || "")
+      const img = new Image("", url)
       img.width = "44px"
       img.height = "44px"
-      if (!img.source) {
+      if (!url || url === "undefined" || url === "null") {
         const q = new TextBlock()
         GuiFramework.setFont(q, true, true)
         q.color = "#4f73ff"

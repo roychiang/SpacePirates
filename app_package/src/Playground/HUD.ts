@@ -21,7 +21,7 @@ class HUDPanel {
     private _healthIcon : Image;
     private _speedIcon : Image;
     private _reloadIcon : Image;
-    private _targets = new Array<TextBlock>();
+    private _targets: Array<TextBlock>;
     private _targetLock: Image;
     private _divisor: number;
     private _index: number;
@@ -43,13 +43,15 @@ class HUDPanel {
         */
         this._targets = [];
         for (let i = 0; i < 30; i++) {
-            const img = new Image("target", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/target.svg"));
-            img.widthInPixels = 40;
-            img.heightInPixels = 40;
-            img.isVisible = false;
-            img.isHitTestVisible = false; // Crucial: Prevent blocking input
-            adt.addControl(img);
-            this._targets.push(img as any);
+            const t = new TextBlock("target", ">");
+            t.widthInPixels = 40;
+            t.heightInPixels = 40;
+            t.fontSize = "24px";
+            t.fontWeight = "bold";
+            t.isVisible = false;
+            t.isHitTestVisible = false; // Crucial: Prevent blocking input
+            adt.addControl(t);
+            this._targets.push(t);
         }
 
         this._targetLock = new Image("img", Assets.joinUrl(assets.assetsHostUrl, "/assets/UI/missileLockIcon.svg"));
@@ -254,32 +256,54 @@ class HUDPanel {
         var l = spo1.x * w * centerInterpolate;
         var t = -spo1.y * h * centerInterpolate;
         
-        // If behind camera
-        if (spo1.z < 0) {
-            control.isVisible = false;
-            return;
+        // If behind camera (View Space Z < 0 is behind in Babylon view space? No, usually +Z is forward in Camera View Space)
+        // Actually, let's rely on w component sign or just invert if z < 0 in View Space
+        // In Babylon, Camera View Matrix: +Z is forward. 
+        // So spo0.z > 0 is in front.
+        const isBehind = spo0.z < 0; 
+
+        if (isBehind) {
+             l = -l;
+             t = -t;
         }
 
         // Clamp to screen edges (Margin 20px)
-        let clamped = false;
-        // Only clamp if not interpolating (i.e. not target lock)
-        // Actually target lock (centerInterpolate < 1) shouldn't clamp? 
-        // But target lock calls this with centerInterpolate.
-        // The arrows call with default 1.
         if (centerInterpolate === 1) {
-            if (l < -w + 20) { l = -w + 20; clamped = true; }
-            else if (l > w - 20) { l = w - 20; clamped = true; }
+            const margin = 20;
+            const limitW = w - margin;
+            const limitH = h - margin;
             
-            if (t < -h + 20) { t = -h + 20; clamped = true; }
-            else if (t > h - 20) { t = h - 20; clamped = true; }
+            // If behind or off-screen
+            const isOffScreen = isBehind || Math.abs(l) > limitW || Math.abs(t) > limitH;
+
+            if (isOffScreen) {
+                const absL = Math.abs(l);
+                const absT = Math.abs(t);
+                
+                let scale = 1.0;
+                if (absL * limitH > absT * limitW) {
+                    scale = limitW / absL;
+                } else {
+                    scale = limitH / absT;
+                }
+                
+                if (l === 0 && t === 0 && isBehind) {
+                     t = limitH; 
+                } else {
+                     l *= scale;
+                     t *= scale;
+                }
+            }
+            control.isVisible = isOffScreen;
+        } else {
+            control.isVisible = true;
         }
 
         l /= this._divisor;
         l += (this._index * this._divisor - Math.floor(this._divisor / 2)) * w / this._divisor;
         control.left = l;
         control.top = t;
-        control.rotation = Math.atan2(spo1.x, spo1.y) + ((spo1.z < 0) ? Math.PI : 0);
-        control.isVisible = true;
+        control.rotation = Math.atan2(t, l);
     }
 }
 
@@ -298,6 +322,7 @@ export class HUD {
     private _radarPanel: Ellipse;
     private _radarDots: Array<Ellipse> = [];
     private _playerLabels: Map<number, TextBlock> = new Map();
+    private _teammateMap: Map<number, Rectangle> = new Map();
 
     constructor(shipManager : ShipManager, assets: Assets, scene: Scene, players: Array<Ship>) {
         console.log(JSON.stringify(Object.getOwnPropertyNames(Parameters)));
@@ -484,6 +509,47 @@ export class HUD {
                  }
             });
             this._adt.addControl(muteBtn);
+
+        // Task 2: Display other players' usernames
+        const grid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+        let teammatesPanel = grid.children.find(c => c.name === "teammatesPanel") as StackPanel;
+        if (!teammatesPanel) {
+            teammatesPanel = new StackPanel("teammatesPanel");
+            teammatesPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+            teammatesPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+            teammatesPanel.isHitTestVisible = false;
+            // Offset below name? Name is at (0,1). Row 0 height is 80. 
+            teammatesPanel.topInPixels = 10; 
+            grid.addControl(teammatesPanel, 1, 1);
+        }
+        teammatesPanel.clearControls();
+        
+        const actors = playService.getRoom()?.actors || [];
+        const me = playService.getActor();
+        actors.forEach(a => {
+            if (me && a.session_id !== me.session_id) {
+                 const container = new Rectangle("teammateContainer");
+                 container.width = "200px";
+                 container.height = "30px";
+                 container.thickness = 0;
+                 container.background = "transparent";
+                 container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+
+                 const t = new TextBlock("teammate", a.name || "Player");
+                 t.color = "white";
+                 t.fontSize = "20px";
+                 t.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                 GuiFramework.setFont(t, true, true);
+                 
+                 container.addControl(t);
+                 teammatesPanel.addControl(container);
+
+                 const joinOrder = parseInt(String(a.properties?.joinOrder || "-1"));
+                 if (joinOrder >= 0) {
+                     this._teammateMap.set(joinOrder, container);
+                 }
+            }
+        });
     }
 
     private _resizeListener() {
@@ -507,6 +573,11 @@ export class HUD {
         });
 
         this._shipManager.ships.forEach((ship, shipIndex) => {
+            const teammateRect = this._teammateMap.get(shipIndex);
+            if (teammateRect) {
+                 teammateRect.background = ship.isValid() ? "transparent" : "#ff0000";
+            }
+
             if (ship.isValid()) {
                 if (ship.faction !== localFaction) {
                     enemyCount++;
@@ -690,6 +761,14 @@ export class HUD {
     }
 
     dispose() {
+        // Cleanup teammates panel from global grid
+        if (this._adt) {
+             const grid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+             const teammatesPanel = grid.children.find(c => c.name === "teammatesPanel");
+             if (teammatesPanel) {
+                 teammatesPanel.dispose();
+             }
+        }
         this._adt.dispose();
         window.removeEventListener("resize", this._resizeListener);
     }

@@ -551,7 +551,9 @@ export class ShipManager {
                     this._assets.audio.thrusterSound.setVolume(Math.max(0, ship.bursting / 2));
                 }
             }
-            this._tickAsteroids(ship, world, explosionManager);
+            if (isHost) {
+                this._tickAsteroids(ship, world, explosionManager);
+            }
             this._tickEndOfLife(ship, index);
         }
     }
