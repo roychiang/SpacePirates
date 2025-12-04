@@ -252,6 +252,18 @@ export class Game {
 
             // Client listens for game end
             playService.on("gameEnd", (p: any) => {
+                // Update statistics if provided
+                if (p && p.stats && Array.isArray(p.stats)) {
+                    p.stats.forEach((s: any, index: number) => {
+                        if (index >= 0 && index < this.humanPlayerShips.length) {
+                             const ship = this.humanPlayerShips[index];
+                             if (ship && ship.statistics) {
+                                 Object.assign(ship.statistics, s);
+                             }
+                        }
+                    });
+                }
+
                 let isVictory = false;
                 if (p && p.winnerFaction !== undefined) {
                     const myFaction = this.humanPlayerShips[this._localPlayerIndex].faction;
@@ -266,6 +278,7 @@ export class Game {
                     State.setCurrent(States.victory);
                 } else if (p && (p.result === "defeat" || !isVictory)) {
                     if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
+                    States.dead.ship = this.humanPlayerShips[this._localPlayerIndex]; // Force local player ship
                     State.setCurrent(States.dead);
                 }
             });
@@ -491,7 +504,11 @@ export class Game {
                         this._HUD.dispose();
                         this._HUD = null;
                     }
-                    playService.broadcastGameEnd({ result: "defeat" });
+                    
+                    const stats = this.humanPlayerShips.map(s => s.statistics);
+                    playService.broadcastGameEnd({ result: "defeat", stats: stats });
+                    
+                    States.dead.ship = this.humanPlayerShips[this._localPlayerIndex];
                     State.setCurrent(States.dead);
                 }
                 this._delayedEnd -= deltaTime;
@@ -501,11 +518,15 @@ export class Game {
                     // Just pick the local player or first human for camera focus
                     const winner = this.humanPlayerShips.find(s => s.isValid()) || this.humanPlayerShips[0];
                     States.victory.ship = winner;
+                    
+                    const stats = this.humanPlayerShips.map(s => s.statistics);
+                    playService.broadcastGameEnd({ result: "victory", stats: stats });
+
                     if (this._HUD) {
                         this._HUD.dispose();
                         this._HUD = null;
                     }
-                    playService.broadcastGameEnd({ result: "victory" });
+                    
                     State.setCurrent(States.victory);
                 }
                 this._delayedEnd -= deltaTime;

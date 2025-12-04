@@ -265,7 +265,7 @@ export class PlayService {
     this.colyseusRoom?.send("gameState", payload);
   }
 
-  broadcastGameEnd(payload: { result?: "victory" | "defeat", winnerFaction?: number }) {
+  broadcastGameEnd(payload: { result?: "victory" | "defeat", winnerFaction?: number, stats?: any[] }) {
     this.colyseusRoom?.send("gameEnd", payload);
   }
 
@@ -285,7 +285,21 @@ export class PlayService {
         app_id: this.appId,
         mode: "team",
         name: r.metadata?.name || ("Room " + r.roomId),
-        actors: new Array(count).fill({} as Actor), // We don't know actors details from listing
+        actors: (() => {
+            if (r.metadata && r.metadata.headIcons) {
+                try {
+                    const icons = JSON.parse(r.metadata.headIcons);
+                    if (Array.isArray(icons)) {
+                        return icons.map((url: string) => ({ 
+                            session_id: "", name: "", 
+                            properties: { headIconUrl: url },
+                            headIconUrl: url 
+                        } as Actor));
+                    }
+                } catch(e) {}
+            }
+            return new Array(count).fill({} as Actor);
+        })(),
         max_players: r.maxClients,
         min_players: 1,
         is_closed: r.locked,

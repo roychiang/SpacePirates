@@ -395,7 +395,7 @@ export class Matchmaking extends State {
       const title = new TextBlock()
       GuiFramework.setFont(title, true, true)
       title.color = "white"
-      title.fontSize = 24
+      title.fontSize = 20
       const modeStr = (r.properties && r.properties.game_mode === "pvp") ? "[PvP]" : "[CO-OP]"
       title.text = `${modeStr} ${r.name || r.id}`
       title.paddingLeft = 10
@@ -411,7 +411,11 @@ export class Matchmaking extends State {
         cell.thickness = 0
         cell.cornerRadius = 22
         cell.background = "#1b2b33"
-        const url = (a.properties && typeof a.properties["headIconUrl"] === "string") ? String(a.properties["headIconUrl"]) : (a.headIconUrl || "")
+        let props = a.properties;
+        if (typeof props === "string") {
+            try { props = JSON.parse(props); } catch (e) { }
+        }
+        const url = (props && typeof props["headIconUrl"] === "string") ? String(props["headIconUrl"]) : (a.headIconUrl || "")
         const img = new Image("", url)
         img.width = "44px"
         img.height = "44px"

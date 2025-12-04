@@ -527,7 +527,7 @@ export class HUD {
         const actors = playService.getRoom()?.actors || [];
         const me = playService.getActor();
         actors.forEach(a => {
-            if (me && a.session_id !== me.session_id) {
+            if (me) {
                  const container = new Rectangle("teammateContainer");
                  container.width = "200px";
                  container.height = "30px";

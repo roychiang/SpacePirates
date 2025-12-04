@@ -102,6 +102,18 @@ export class GameRoom extends Room<GameState> {
         });
     }
 
+    updatePlayerMetadata() {
+        const headIcons: string[] = [];
+        this.state.players.forEach((p) => {
+             headIcons.push(p.headIconUrl || "");
+        });
+        this.setMetadata({ 
+            ...this.metadata, 
+            playerCount: this.state.players.size,
+            headIcons: JSON.stringify(headIcons)
+        });
+    }
+
     onJoin(client: Client, options: any) {
         // Check custom limit
         if (this.state.players.size >= this.customMaxPlayers) {
@@ -117,16 +129,16 @@ export class GameRoom extends Room<GameState> {
         player.joinOrder = this.state.players.size; // Assign join order based on current player count
         this.state.players.set(client.sessionId, player);
         
-        // Update metadata with player count
-        this.setMetadata({ ...this.metadata, playerCount: this.state.players.size });
+        // Update metadata with player count and icons
+        this.updatePlayerMetadata();
     }
 
     onLeave(client: Client, consented: boolean) {
         console.log(client.sessionId, "left!");
         this.state.players.delete(client.sessionId);
         
-        // Update metadata with player count
-        this.setMetadata({ ...this.metadata, playerCount: this.state.players.size });
+        // Update metadata with player count and icons
+        this.updatePlayerMetadata();
     }
 
     onDispose() {
