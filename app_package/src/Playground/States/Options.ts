@@ -6,6 +6,7 @@ import { States } from "./States";
 import { Parameters } from '../Parameters';
 import { Settings } from "../../Settings";
 import { GuiFramework } from "../GuiFramework";
+import { playService } from "../../Viverse/Viverse";
 
 export class Options extends State {
 
@@ -45,6 +46,11 @@ export class Options extends State {
             const sensitivitySlider: Control = GuiFramework.createParameter(parametersGrid, "Sensitivity", GuiFramework.createSlider(0.05, 2.0), Settings.sensitivity);
             (sensitivitySlider as Slider).onValueChangedObservable.add((newValue) => {
                 Settings.sensitivity = newValue;
+            });
+            const micSlider: Control = GuiFramework.createParameter(parametersGrid, "Mic Volume", GuiFramework.createSlider(0, 1.0), Settings.micVolume);
+            (micSlider as Slider).onValueChangedObservable.add((newValue) => {
+                Settings.micVolume = newValue;
+                playService.voiceManager.setMicVolume(newValue);
             });
             const showParameters: Control = GuiFramework.createParameter(parametersGrid, "Show Parameters", GuiFramework.createCheckbox(), Number(Settings.showParameters));
             (showParameters as Checkbox).onIsCheckedChangedObservable.add((checked) => {
@@ -92,6 +98,11 @@ export class Options extends State {
             const sensitivitySlider: Control = GuiFramework.createParameter(parametersGrid, "Sensitivity", GuiFramework.createSlider(0.05, 2.0), Settings.sensitivity);
             (sensitivitySlider as Slider).onValueChangedObservable.add((newValue) => {
                 Settings.sensitivity = newValue;
+            });
+            const micSlider: Control = GuiFramework.createParameter(parametersGrid, "Mic Volume", GuiFramework.createSlider(0, 1.0), Settings.micVolume);
+            (micSlider as Slider).onValueChangedObservable.add((newValue) => {
+                Settings.micVolume = newValue;
+                playService.voiceManager.setMicVolume(newValue);
             });
             const showParameters: Control = GuiFramework.createParameter(parametersGrid, "Show Parameters", GuiFramework.createCheckbox(), Number(Settings.showParameters));
             (showParameters as Checkbox).onIsCheckedChangedObservable.add((checked) => {

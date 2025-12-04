@@ -1,9 +1,13 @@
 import { Peer, MediaConnection } from "peerjs";
 import { Config } from "../Config";
+import { Settings } from "../Settings";
 
 export class VoiceManager {
     private _peer: Peer | null = null;
     private _localStream: MediaStream | null = null;
+    private _processedStream: MediaStream | null = null;
+    private _audioCtx: AudioContext | null = null;
+    private _micGain: GainNode | null = null;
     private _connections: Map<string, MediaConnection> = new Map();
     private _myPeerId: string = "";
     private _isMuted: boolean = false;
@@ -25,10 +29,21 @@ export class VoiceManager {
 
         try {
             this._localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+            if (Ctx) {
+                this._audioCtx = new Ctx();
+                if (this._audioCtx && this._localStream) {
+                    const src = this._audioCtx.createMediaStreamSource(this._localStream);
+                    this._micGain = this._audioCtx.createGain();
+                    this._micGain.gain.value = Settings.micVolume;
+                    const dest = this._audioCtx.createMediaStreamDestination();
+                    src.connect(this._micGain);
+                    this._micGain.connect(dest);
+                    this._processedStream = dest.stream;
+                }
+            }
         } catch (err) {
             console.error("VoiceManager: Failed to get local audio stream", err);
-            // We continue even if mic fails, so we can hear others? No, peerjs needs stream for call usually, 
-            // but we can receive calls without stream.
         }
 
         // Initialize PeerJS
@@ -60,7 +75,7 @@ export class VoiceManager {
         console.log(`VoiceManager: Calling ${targetId} (orig: ${remotePeerId})...`);
         // We can call even if we don't have a stream (receive only mode?)
         // PeerJS documentation says we can pass undefined stream.
-        const stream = this._localStream || new MediaStream();
+        const stream = this._processedStream || this._localStream || new MediaStream();
         const call = this._peer.call(targetId, stream);
         this._handleCall(call);
     }
@@ -126,6 +141,12 @@ export class VoiceManager {
             this._localStream = null;
         }
 
+        this._processedStream = null;
+        if (this._audioCtx) {
+            this._audioCtx.close();
+            this._audioCtx = null;
+        }
+
         if (this._peer) {
             this._peer.destroy();
             this._peer = null;
@@ -147,5 +168,9 @@ export class VoiceManager {
 
     public isMuted(): boolean {
         return this._isMuted;
+    }
+
+    public setMicVolume(v: number): void {
+        if (this._micGain) this._micGain.gain.value = v;
     }
 }

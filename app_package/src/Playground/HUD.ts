@@ -232,7 +232,7 @@ class HUDPanel {
         this._speed.alpha = alpha;
         this._health.alpha = alpha;
         this._targets.forEach(image => {
-            image.alpha = alpha * 0.4;
+            image.alpha = 1;
         });
         this._targetLock.alpha = alpha * 0.4;
         //this._fpsCounter.alpha = alpha;
@@ -471,6 +471,7 @@ export class HUD {
             muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
             muteBtn.left = "-20px";
             muteBtn.top = "20px";
+            if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
             if (playService.voiceManager.isMuted()) {
                  muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
             }
@@ -587,6 +588,8 @@ export class HUD {
 
         if (localShip && localShip.isValid()) {
             this._radarPanel.isVisible = false; // Hide Radar per user request
+            const playersOnline = this._adt.getControlByName("globalPlayersOnline") as TextBlock
+            if (playersOnline) playersOnline.isVisible = false // Hide players online text in HUD
             this._radarPanel.isHitTestVisible = false; // Ensure radar panel don't block input
             const rot = localShip.root.rotationQuaternion;
             const invertRot = rot ? Quaternion.Inverse(rot!) : Quaternion.Identity();

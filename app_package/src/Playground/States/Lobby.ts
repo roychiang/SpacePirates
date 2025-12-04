@@ -21,13 +21,15 @@ export class Lobby extends State {
   private onActorLeft = () => this.refresh()
   private onReadyChanged = () => this.refresh()
 
+
+
   public enter() {
     super.enter()
     this.isStarting = false
     if (!this._adt) return
     GuiFramework.setOrientation(this._adt)
     GuiFramework.createBottomBar(this._adt)
-    GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
+    const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
     const root = new Grid()
     GuiFramework.formatButtonGrid(root)
     const panel = new StackPanel()
@@ -56,13 +58,14 @@ export class Lobby extends State {
     this._adt.addControl(root)
 
     // Mute button (Upper Right)
-        const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
-        muteBtn.width = "60px";
-        muteBtn.height = "60px";
-        muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-        muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-        muteBtn.left = "-20px";
-        muteBtn.top = "20px";
+      const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
+      muteBtn.width = "60px";
+      muteBtn.height = "60px";
+      muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+      muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+      muteBtn.left = "-20px";
+      muteBtn.top = "20px";
+      if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
         if (playService.voiceManager.isMuted()) {
              muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
         }
@@ -74,7 +77,46 @@ export class Lobby extends State {
                  muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
              }
         });
-        this._adt.addControl(muteBtn);
+      this._adt.addControl(muteBtn);
+
+    // Players Online under username
+    let playersText = avatarGrid.children.find(c => c.name === "globalPlayersOnline") as TextBlock
+    if (!playersText) {
+      playersText = new TextBlock("globalPlayersOnline", "Players Online: --")
+      GuiFramework.setFont(playersText, true, true)
+      playersText.color = "#a6fffa"
+      playersText.fontSize = 24
+      playersText.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+      playersText.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+      playersText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+      playersText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+      playersText.isHitTestVisible = false
+      playersText.width = "300px"
+      playersText.height = "30px"
+      playersText.textWrapping = false
+      playersText.topInPixels = 26
+      avatarGrid.addControl(playersText, 1, 1)
+    }
+    const updatePlayers = () => {
+      playService.getAvailableRooms().then(res => {
+        const rooms = (res && res.rooms) ? res.rooms : []
+        const appId = playService.getAppId()
+        const filtered = rooms.filter((r: any) => {
+          const sameApp = typeof r.app_id === "string" ? (r.app_id === appId) : false
+          const sameGame = !!(r.properties && r.properties["gameId"] === "SpacePirates")
+          return sameApp || sameGame
+        })
+        const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0)
+        const t = avatarGrid.children.find(c => c.name === "globalPlayersOnline") as TextBlock
+        if (t) {
+            t.text = ""
+            t.text = `Players Online: ${total}`
+        }
+      }).catch(() => {})
+    }
+    updatePlayers()
+    if (this.refreshTimer) window.clearInterval(this.refreshTimer)
+    this.refreshTimer = window.setInterval(() => { this.refresh(); updatePlayers(); }, 2000)
 
     playService.ensureActorPresentInRoom().then(() => this.refresh())
       ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
@@ -201,9 +243,15 @@ export class Lobby extends State {
     if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
     if (this.refreshTimer) { window.clearInterval(this.refreshTimer); this.refreshTimer = undefined }
     ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
-      ; (playService as any).off?.("actorJoined", this.onActorJoined)
-      ; (playService as any).off?.("actorLeft", this.onActorLeft)
-      ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
+    ; (playService as any).off?.("actorJoined", this.onActorJoined)
+    ; (playService as any).off?.("actorLeft", this.onActorLeft)
+    ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
+    
+    if (this._adt) {
+        const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
+        const t = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline")
+        if (t) avatarGrid.removeControl(t)
+    }
   }
 
   private async loadStatus() {

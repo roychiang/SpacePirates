@@ -24,6 +24,7 @@ export class Matchmaking extends State {
   public enter() {
     super.enter()
     if (!this._adt) return
+    const adt = this._adt
     authService.initClient({ clientId: "4p4wmv9d5z", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
     playService.newMatchmakingClient("4p4wmv9d5z", true).then(() => {
       ; (playService as any).off?.("connected", this.onConnected)
@@ -45,7 +46,7 @@ export class Matchmaking extends State {
     panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM
     root.addControl(panel, 0, 0)
     const content = GuiFramework.createTextPanel(root)
-    GuiFramework.createPageTitle(this.pvpMode ? "MATCHMAKING [PvP]" : "MATCHMAKING [CO-OP]", content)
+    GuiFramework.createPageTitle(this.pvpMode ? "SELECT ROOM [PVP]" : "SELECT ROOM [CO-OP]", content)
     console.log("[UI] SDK", !!getViverse(), "TOKEN", false)
     this.roomsPanel = new StackPanel()
     this.roomsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
@@ -89,6 +90,46 @@ export class Matchmaking extends State {
     pvpPanel.addControl(pvpLabel);
 
     actions.addControl(pvpPanel, 1, 0);
+    // Players Online under username
+    const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
+    let playersText = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline") as TextBlock
+    if (!playersText) {
+      playersText = new TextBlock("globalPlayersOnline", "Players Online: --")
+      GuiFramework.setFont(playersText, true, true)
+      playersText.color = "#a6fffa"
+      playersText.fontSize = 24
+      playersText.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+      playersText.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+      playersText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+      playersText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
+      playersText.isHitTestVisible = false
+      playersText.width = "300px"
+      playersText.height = "30px"
+      playersText.textWrapping = false
+      playersText.topInPixels = 26
+      avatarGrid.addControl(playersText, 1, 1)
+    }
+    ;(this as any)._playersOnlineText = playersText
+    const updatePlayers = () => {
+      playService.getAvailableRooms().then(res => {
+        const rooms = (res && res.rooms) ? res.rooms : []
+        const appId = playService.getAppId()
+        const filtered = rooms.filter((r: any) => {
+          const sameApp = typeof r.app_id === "string" ? (r.app_id === appId) : false
+          const sameGame = !!(r.properties && r.properties["gameId"] === "SpacePirates")
+          return sameApp || sameGame
+        })
+        const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0)
+        const t = (this as any)._playersOnlineText as TextBlock
+        if (t) {
+             t.text = ""
+             t.text = `Players Online: ${total}`
+        }
+      }).catch(() => {})
+    }
+    updatePlayers()
+    if ((this as any)._playersTimer) window.clearInterval((this as any)._playersTimer)
+    ;(this as any)._playersTimer = window.setInterval(updatePlayers, 2000)
 
     const createBtn = GuiFramework.addButton("Create Room", panel)
     this.joinBtn = GuiFramework.addButton("Join Room", panel)
@@ -184,6 +225,7 @@ export class Matchmaking extends State {
         muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         muteBtn.left = "-20px";
         muteBtn.top = "20px";
+        if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
         if (playService.voiceManager.isMuted()) {
              muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
         }
@@ -238,6 +280,12 @@ export class Matchmaking extends State {
     if (this.roomsTimer) window.clearInterval(this.roomsTimer)
       ; (playService as any).off?.("connected", this.onConnected)
       ; (playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
+    if ((this as any)._playersTimer) window.clearInterval((this as any)._playersTimer)
+    if ((this as any)._playersOnlineText) {
+      const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt!) // Use existing adt or global
+      avatarGrid.removeControl((this as any)._playersOnlineText)
+      ;(this as any)._playersOnlineText = undefined
+    }
   }
 
   private async refreshRooms(roomsOverride?: any[]) {
@@ -247,13 +295,18 @@ export class Matchmaking extends State {
     // Filter rooms by game mode
     const expectedMode = this.pvpMode ? "pvp" : "coop"
     const allRooms = res.rooms || []
-    const filteredRooms = allRooms.filter((r: any) => {
+    let filteredRooms = allRooms.filter((r: any) => {
       // Check both properties (mapped from metadata) and metadata directly if available
       const props = r.properties || r.metadata || {}
       const roomMode = props.game_mode || "coop" // Default to coop if not set
       const matches = roomMode === expectedMode
       console.log("[UI] Room filter check:", { roomId: r.id, roomName: r.name, roomMode, expectedMode, matches, properties: props })
       return matches
+    })
+    filteredRooms = filteredRooms.filter((r: any) => {
+      const actorList = (r.actors || [])
+      const count = Array.isArray(actorList) ? actorList.length : 0
+      return count > 0 && !r.is_closed
     })
 
     this.listedRooms = filteredRooms
@@ -323,12 +376,12 @@ export class Matchmaking extends State {
       row.addControl(container, 0, 0)
       const cb = new Checkbox()
       cb.isChecked = this.selectedRoomId === r.id
-      cb.width = "24px"
-      cb.height = "24px"
+      cb.width = "32px"
+      cb.height = "32px"
       cb.isEnabled = canJoinRow
       cb.color = canJoinRow ? "#2ecc71" : "#555555"
       cb.background = "#1a2a33"
-      cb.thickness = 2
+      cb.thickness = 3
       cb.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
       cb.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
       cb.onIsCheckedChangedObservable.add((val) => {
@@ -342,7 +395,7 @@ export class Matchmaking extends State {
       const title = new TextBlock()
       GuiFramework.setFont(title, true, true)
       title.color = "white"
-      title.fontSize = 22
+      title.fontSize = 32
       const modeStr = (r.properties && r.properties.game_mode === "pvp") ? "[PvP]" : "[CO-OP]"
       title.text = `${modeStr} ${r.name || r.id}`
       title.paddingLeft = 10
@@ -361,7 +414,7 @@ export class Matchmaking extends State {
         const img = new Image("", (a.properties && typeof a.properties["headIconUrl"] === "string") ? String(a.properties["headIconUrl"]) : "")
         img.width = "44px"
         img.height = "44px"
-        if (!img.source) {
+        if (!img.source || img.source === "undefined" || img.source === "null") {
           const q = new TextBlock()
           GuiFramework.setFont(q, true, true)
           q.color = "#4f73ff"
@@ -412,7 +465,7 @@ export class Matchmaking extends State {
   private updatePanelTitle() {
     const header = this._adt?.getControlByName("panelTitle") as TextBlock
     if (header) {
-      header.text = this.pvpMode ? "MATCHMAKING [PvP]" : "MATCHMAKING [CO-OP]"
+      header.text = this.pvpMode ? "SELECT ROOM [PVP]" : "SELECT ROOM [CO-OP]"
     }
   }
 
