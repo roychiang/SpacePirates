@@ -30,7 +30,7 @@ export class AuthService {
           domain: config.domain,
           cookieDomain: config.cookieDomain || window.location.hostname
         })
-        ;(globalThis as any).viverseClient = this.sdkClient
+          ; (globalThis as any).viverseClient = this.sdkClient
         console.log("[Auth] new viverse.client instantiated", { clientId: config.clientId, domain: config.domain, cookieDomain: (config.cookieDomain || window.location.hostname) })
       } catch (e) {
         console.log("[Auth] instantiate client error", e)
@@ -48,7 +48,7 @@ export class AuthService {
               domain: config.domain,
               cookieDomain: config.cookieDomain || window.location.hostname
             })
-            ;(globalThis as any).viverseClient = this.sdkClient
+              ; (globalThis as any).viverseClient = this.sdkClient
             console.log("[Auth] UMD script loaded and client instantiated", { clientId: config.clientId, domain: config.domain, cookieDomain: (config.cookieDomain || window.location.hostname) })
           } else {
             console.log("[Auth] UMD script loaded but client constructor missing")
@@ -139,7 +139,7 @@ export class AuthService {
           this.guestName = `guest-${rand}`
           window.localStorage.setItem("sp_guest_name", this.guestName)
         }
-      } catch {}
+      } catch { }
       if (!this.guestName) {
         const rand = Math.floor(Math.random() * 100000)
         this.guestName = `guest-${rand}`
@@ -168,5 +168,19 @@ export class AuthService {
 
   async isGuest(): Promise<boolean> {
     return true
+  }
+
+  loginWithWorlds(options?: any): void {
+    const instance = this.sdkClient || (globalThis as any).viverseClient
+    if (instance && typeof instance.loginWithWorlds === "function") {
+      try {
+        console.log("[Auth] Triggering loginWithWorlds")
+        instance.loginWithWorlds(options)
+      } catch (e) {
+        console.log("[Auth] loginWithWorlds error", e)
+      }
+    } else {
+      console.log("[Auth] loginWithWorlds not available")
+    }
   }
 }

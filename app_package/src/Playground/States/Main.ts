@@ -8,7 +8,7 @@ import { State } from "./State";
 import { States } from "./States";
 import { Assets } from "../Assets";
 import { GuiFramework } from "../GuiFramework";
-import { playService } from "../../Viverse/Viverse";
+import { playService, authService, avatarService } from "../../Viverse/Viverse";
 
 export class Main extends State {
 
@@ -116,6 +116,32 @@ export class Main extends State {
             });
             this._adt.addControl(grid);
             const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+
+            // Check VIVERSE Auth
+            authService.checkAuth().then(async (info) => {
+                if (info) {
+                    console.log("[Main] User logged in:", info);
+                    try {
+                        const profile = await avatarService.getProfile();
+                        GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl);
+                    } catch (e) {
+                        console.warn("[Main] Failed to get profile", e);
+                        GuiFramework.updateTopLeftAvatar("Player");
+                    }
+                } else {
+                    const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
+                    if (!isViverseDomain) {
+                        console.log("[Main] User not logged in, showing login button");
+                        GuiFramework.attachLoginButton(() => {
+                            console.log("[Main] Login clicked");
+                            authService.loginWithWorlds();
+                        });
+                    } else {
+                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
+                    }
+                }
+            });
+
             let playersText = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline") as TextBlock;
             if (!playersText) {
                 playersText = new TextBlock("globalPlayersOnline", "Players Online: --");
@@ -228,6 +254,32 @@ export class Main extends State {
             });
             this._adt.addControl(panel);
             const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+
+            // Check VIVERSE Auth (Portrait)
+            authService.checkAuth().then(async (info) => {
+                if (info) {
+                    console.log("[Main] User logged in:", info);
+                    try {
+                        const profile = await avatarService.getProfile();
+                        GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl);
+                    } catch (e) {
+                        console.warn("[Main] Failed to get profile", e);
+                        GuiFramework.updateTopLeftAvatar("Player");
+                    }
+                } else {
+                    const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
+                    if (!isViverseDomain) {
+                        console.log("[Main] User not logged in, showing login button");
+                        GuiFramework.attachLoginButton(() => {
+                            console.log("[Main] Login clicked");
+                            authService.loginWithWorlds();
+                        });
+                    } else {
+                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
+                    }
+                }
+            });
+
             let playersText = this._adt.getControlByName("globalPlayersOnline") as TextBlock;
             if (!playersText) {
                 playersText = new TextBlock("globalPlayersOnline", "Players Online: --");

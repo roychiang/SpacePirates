@@ -14,7 +14,7 @@ export class State {
     constructor() {
         this._resizeListener = this._resizeListener.bind(this);
     }
-    
+
     public static setCurrent(newState: State): void {
         if (this.currentState === newState) {
             return;
@@ -49,7 +49,7 @@ export class State {
                 const url = avatarService.getHeadIconUrlOrDefault(p)
                 GuiFramework.updateTopLeftAvatar(p?.name, url)
             }
-            ;(async () => {
+            ; (async () => {
                 authService.initClient({ clientId: "4p4wmv9d5z", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
                 const attempt = async () => {
                     const ts = new Date().toISOString()
@@ -63,17 +63,25 @@ export class State {
                     const t0 = performance.now()
                     const name = await authService.getDisplayName(token)
                     const profile = await avatarService.getProfile()
-                    ;(avatarService as any).profile = profile
+                        ; (avatarService as any).profile = profile
                     const url = avatarService.getHeadIconUrlOrDefault(profile)
                     const t1 = performance.now()
                     console.log("[Avatar] name", name, "url", url, "ts", new Date().toISOString(), "ms", Math.round(t1 - t0))
                     GuiFramework.updateTopLeftAvatar(name, url)
                     if (!token) {
                         try {
-                            const parentOrigin = (document.referrer && document.referrer.startsWith("http")) ? new URL(document.referrer).origin : "*"
-                            window.parent?.postMessage({ method: "initialize-auth" }, parentOrigin)
-                            console.log("[Auth] initialize-auth posted to parent", parentOrigin)
-                        } catch {}
+                            const isEmbedded = window.parent !== window
+                            if (isEmbedded) {
+                                const parentOrigin = (document.referrer && document.referrer.startsWith("http")) ? new URL(document.referrer).origin : "*"
+                                window.parent?.postMessage({ method: "initialize-auth" }, parentOrigin)
+                                console.log("[Auth] initialize-auth posted to parent", parentOrigin)
+                            } else {
+                                GuiFramework.attachLoginButton(() => {
+                                    authService.loginWithWorlds()
+                                })
+                                console.log("[Auth] Standalone mode: Login button attached")
+                            }
+                        } catch (e) { console.log("[Auth] Error in auth flow", e) }
                     }
                 }
                 const hasClient = !!getViverse()?.client || !!(globalThis as any).viverseClient
@@ -91,7 +99,7 @@ export class State {
                         } else {
                             console.log("[SDK] not available after retries")
                         }
-                }
+                    }
                     setTimeout(tick, 1000)
                 }
             })()

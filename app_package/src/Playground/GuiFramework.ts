@@ -10,12 +10,12 @@ export class GuiFramework {
         style: "normal"
     }
 
-    public static isLandscape : boolean;
-    public static screenWidth : number;
-    public static screenHeight : number;
-    public static screenRatio : number;
-    public static ratioBreakPoint : number = 1.4;
-    public static currentAdt : AdvancedDynamicTexture;
+    public static isLandscape: boolean;
+    public static screenWidth: number;
+    public static screenHeight: number;
+    public static screenRatio: number;
+    public static ratioBreakPoint: number = 1.4;
+    public static currentAdt: AdvancedDynamicTexture;
     public static globalOverlayAdt?: AdvancedDynamicTexture;
     public static cachedName?: string;
     public static cachedUrl?: string;
@@ -48,13 +48,13 @@ export class GuiFramework {
     public static updateScreenRatio(engine: Engine) {
         this.screenWidth = engine.getRenderWidth(true);
         this.screenHeight = engine.getRenderHeight(true);
-        this.screenRatio = this.screenWidth/this.screenHeight;
+        this.screenRatio = this.screenWidth / this.screenHeight;
         this.setOrientation()
     }
 
     public static createBottomBar(adt: AdvancedDynamicTexture) {
-        const fallbackUrl = window.location.href.includes('/docs/') 
-            ? window.location.origin + '/docs/' 
+        const fallbackUrl = window.location.href.includes('/docs/')
+            ? window.location.origin + '/docs/'
             : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
         const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
         let bottomBarLeft: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/bottomBarLeft.svg"));
@@ -72,8 +72,8 @@ export class GuiFramework {
         grid.addControl(bottomBarLeft, 0, 0);
         grid.addControl(bottomBarCenter, 0, 1);
         grid.addControl(bottomBarRight, 0, 2);
-        adt.addControl(grid);  
-        
+        adt.addControl(grid);
+
         // add in portrait warning... to do add portrait mode UI
         // let portraitWarning = new TextBlock ("portraitWarning", "Please play this game in landscape mode".toUpperCase());
         // this.setFont(portraitWarning, true, true);
@@ -190,11 +190,49 @@ export class GuiFramework {
         }
     }
 
-    
+    public static attachLoginButton(callback: () => void) {
+        const adt = this.globalOverlayAdt || this.currentAdt
+        if (!adt) return
+        const grid = adt.getControlByName("globalAvatarGrid") as Grid
+        if (!grid) return
+
+        let loginBtn = grid.children.find(c => c.name === "globalLoginBtn") as Button
+        if (!loginBtn) {
+            loginBtn = Button.CreateSimpleButton("globalLoginBtn", "Log In")
+            loginBtn.width = "100px"
+            loginBtn.height = "36px"
+            loginBtn.color = "#a6fffa"
+            loginBtn.cornerRadius = 18
+            loginBtn.background = "#1b2b33"
+            loginBtn.thickness = 2
+            loginBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
+            loginBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
+            loginBtn.fontSize = 16
+            this.setFont(loginBtn, true, false)
+            // Add a new column for the button or place it in the name area if space permits
+            // For simplicity, we'll add it to column 2 if it exists, or just overlay it
+            // The grid defined in createTopLeftAvatar has 2 columns: 0 (avatar), 1 (name)
+            // We can add it to column 1, offset to the right of the name
+
+            // Actually, let's just add it to column 1 and use padding to position it
+            // Or better, let's modify the grid definition in createTopLeftAvatar if we want a clean layout
+            // BUT, since we shouldn't change the existing layout too much, let's just place it over the name area but visible
+
+            // Let's attach it to the grid at column 1
+            loginBtn.paddingLeft = "150px" // Offset past the name
+            grid.addControl(loginBtn, 0, 1)
+        }
+
+        loginBtn.onPointerUpObservable.clear()
+        loginBtn.onPointerUpObservable.add(callback)
+        loginBtn.isVisible = true
+    }
+
+
 
     public static createTextPanel(parentGrid: Grid) {
-        const fallbackUrl = window.location.href.includes('/docs/') 
-            ? window.location.origin + '/docs/' 
+        const fallbackUrl = window.location.href.includes('/docs/')
+            ? window.location.origin + '/docs/'
             : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
         const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
         let textPanelUL: Image = new Image("bottomBarLeft", Assets.joinUrl(assetsHostUrl, "/assets/UI/textPanelUL.svg"));
@@ -237,7 +275,7 @@ export class GuiFramework {
         this.setFont(textBlock, true, true);
         textBlock.fontSize = 35;
         textBlock.color = "#a6fffa";
-        textBlock.horizontalAlignment =  Control.HORIZONTAL_ALIGNMENT_LEFT;
+        textBlock.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
         textBlock.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
         textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
         textBlock.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
@@ -369,7 +407,7 @@ export class GuiFramework {
     public static createStatsGrid() {
         let grid: Grid = new Grid();
         grid.addColumnDefinition(0.5, false);
-        grid.addColumnDefinition(0.5, false);    
+        grid.addColumnDefinition(0.5, false);
         grid.width = 1.0;
         grid.topInPixels = 0;
         grid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
@@ -380,7 +418,7 @@ export class GuiFramework {
     public static createParametersGrid() {
         let grid: Grid = new Grid();
         grid.addColumnDefinition(0.4, false);
-        grid.addColumnDefinition(0.6, false);    
+        grid.addColumnDefinition(0.6, false);
         grid.width = 0.6;
         grid.topInPixels = -100;
         grid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
@@ -414,7 +452,7 @@ export class GuiFramework {
             this.setFont(sliderValue, true, true);
             sliderValue.color = "white";
             sliderValue.fontSize = 24;
-    
+
             let slider = controlType as Slider;
             slider.onValueChangedObservable.add(() => {
                 sliderValue.text = Math.floor(slider.value * 100) as unknown as string;
@@ -448,8 +486,8 @@ export class GuiFramework {
     }
 
     public static addButton(label: string, panel: StackPanel): Button {
-        const fallbackUrl = window.location.href.includes('/docs/') 
-            ? window.location.origin + '/docs/' 
+        const fallbackUrl = window.location.href.includes('/docs/')
+            ? window.location.origin + '/docs/'
             : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
         const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
         var button = Button.CreateImageButton("button", label.toUpperCase(), Assets.joinUrl(assetsHostUrl, "/assets/UI/menuButton.svg"));
