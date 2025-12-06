@@ -140,6 +140,16 @@ export class Main extends State {
                          console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
                 }
+            }).catch((e) => {
+                console.warn("[Main] checkAuth failed", e);
+                const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
+                if (!isViverseDomain) {
+                    console.log("[Main] User checkAuth failed, showing login button");
+                    GuiFramework.attachLoginButton(() => {
+                        console.log("[Main] Login clicked");
+                        authService.loginWithWorlds();
+                    });
+                }
             });
 
             let playersText = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline") as TextBlock;
@@ -277,6 +287,16 @@ export class Main extends State {
                     } else {
                          console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
+                }
+            }).catch((e) => {
+                console.warn("[Main] checkAuth failed", e);
+                const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
+                if (!isViverseDomain) {
+                    console.log("[Main] User checkAuth failed, showing login button");
+                    GuiFramework.attachLoginButton(() => {
+                        console.log("[Main] Login clicked");
+                        authService.loginWithWorlds();
+                    });
                 }
             });
 
