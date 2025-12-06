@@ -192,12 +192,23 @@ export class GuiFramework {
 
     public static attachLoginButton(callback: () => void) {
         const adt = this.globalOverlayAdt || this.currentAdt
-        if (!adt) return
+        if (!adt) {
+            console.warn("[GuiFramework] attachLoginButton failed: No ADT available");
+            return;
+        }
+        
+        // Ensure the avatar grid exists
+        this.ensureGlobalTopLeftAvatar(adt);
+        
         const grid = adt.getControlByName("globalAvatarGrid") as Grid
-        if (!grid) return
+        if (!grid) {
+             console.warn("[GuiFramework] attachLoginButton failed: globalAvatarGrid not found after ensure");
+             return;
+        }
 
         let loginBtn = grid.children.find(c => c.name === "globalLoginBtn") as Button
         if (!loginBtn) {
+            console.log("[GuiFramework] Creating new login button");
             loginBtn = Button.CreateSimpleButton("globalLoginBtn", "Log In")
             loginBtn.width = "100px"
             loginBtn.height = "36px"
@@ -209,18 +220,81 @@ export class GuiFramework {
             loginBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
             loginBtn.fontSize = 16
             this.setFont(loginBtn, true, false)
-            // Add a new column for the button or place it in the name area if space permits
-            // For simplicity, we'll add it to column 2 if it exists, or just overlay it
-            // The grid defined in createTopLeftAvatar has 2 columns: 0 (avatar), 1 (name)
-            // We can add it to column 1, offset to the right of the name
-
-            // Actually, let's just add it to column 1 and use padding to position it
-            // Or better, let's modify the grid definition in createTopLeftAvatar if we want a clean layout
-            // BUT, since we shouldn't change the existing layout too much, let's just place it over the name area but visible
-
-            // Let's attach it to the grid at column 1
-            loginBtn.paddingLeft = "150px" // Offset past the name
-            grid.addControl(loginBtn, 0, 1)
+            
+            // Layout: 
+            // Column 0: Avatar (64px + padding)
+            // Column 1: Name (Rest)
+            // We want to put the button to the right of the name or in place of it if empty?
+            // Current createTopLeftAvatar defines:
+            // grid.addColumnDefinition(200, true) // 0: Avatar cell (which is StackPanel)
+            // grid.addColumnDefinition(1.0, false) // 1: Name
+            
+            // Wait, createTopLeftAvatar definition:
+            // grid.addColumnDefinition(200, true) -> This is actually huge for just avatar (64px). 
+            // The avatarCell is added at 0,0.
+            // The name is added at 0,1.
+            
+            // Let's verify grid definition in createTopLeftAvatar:
+            // grid.addColumnDefinition(200, true)
+            // grid.addColumnDefinition(1.0, false)
+            
+            // So column 0 is 200px wide. Avatar is 64px. 
+            // If we add button to column 1, it overlaps with Name.
+            // Let's add it to column 1 but push it right.
+            
+            loginBtn.paddingLeft = "10px"; // Give some space from the start of the column
+            
+            // But wait, if name is present, we might want it next to it?
+            // Let's just put it in column 1 for now, assuming name might be "Guest" or hidden.
+            
+            // If we want it strictly "next to avatar", we should put it in column 1.
+            // But the name is also in column 1.
+            
+            // Let's check if we can adjust the grid.
+            // Ideally we add a 3rd column.
+            
+            // Babylon.js GUI Grid doesn't expose columnDefinitions length directly in older versions or types might be strict.
+            // We can just blindly add a column definition, it appends.
+            // But we don't want to keep adding it if called multiple times.
+            // We are already checking if loginBtn exists, so this block runs only once per button creation.
+            // However, the grid might persist across sessions if we are not careful (but GuiFramework seems to reuse).
+            
+            // Let's assume we need to add a column for the button.
+            // grid.addColumnDefinition(120, true);
+            
+            // Actually, let's keep it simple. The previous code had paddingLeft 150px in column 1.
+            // Column 0 is Avatar (200px).
+            // Column 1 is Name (1.0 star).
+            // If we put button in Column 1 with paddingLeft 150px, it assumes the Name is shorter than 150px?
+            // Or it overlaps.
+            
+            // Better approach:
+            // Put it in Column 1.
+            // Align it LEFT.
+            // Give it a large left margin to push it past the name? No, name length varies.
+            
+            // Let's use a StackPanel in Column 1?
+            // If the grid cell 1 already contains the TextBlock for name.
+            // We can't easily wrap them in a stack panel without removing the name first.
+            
+            // Let's just place it at the top right of the screen or fixed position?
+            // No, it should be next to avatar.
+            
+            // Let's add a new column at index 2.
+            try {
+                grid.addColumnDefinition(120, true);
+                grid.addControl(loginBtn, 0, 2);
+            } catch (e) {
+                // Fallback if addColumnDefinition fails or index 2 is invalid logic
+                console.log("[GuiFramework] Error adding column, falling back to col 1", e);
+                loginBtn.paddingLeft = "150px";
+                grid.addControl(loginBtn, 0, 1);
+            }
+            
+            // Ensure zIndex is high
+            loginBtn.zIndex = 10;
+        } else {
+             console.log("[GuiFramework] Login button already exists");
         }
 
         loginBtn.onPointerUpObservable.clear()
