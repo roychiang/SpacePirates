@@ -23,7 +23,21 @@ gameServer.define("lobby", LobbyRoom);
 gameServer.define("game_room", GameRoom)
     .enableRealtimeListing();
 
-app.use("/colyseus", monitor());
+import { Request, Response, NextFunction } from "express";
+
+function tokenGuard(token: string) {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const value = req.query.token || req.headers["x-monitor-token"];
+        if (value === token) return next();
+        return res.status(403).send("Forbidden");
+    };
+}
+
+app.use(
+    "/colyseus",
+    tokenGuard(process.env.MONITOR_TOKEN || "dev-token"),
+    monitor()
+);
 
 gameServer.listen(port);
 console.log(`Listening on ws://localhost:${port}`);
