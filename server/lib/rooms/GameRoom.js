@@ -155,6 +155,13 @@ class GameRoom extends colyseus_1.Room {
             this.setMetadata(newMetadata);
         });
     }
+    updatePlayerMetadata() {
+        const headIcons = [];
+        this.state.players.forEach((p) => {
+            headIcons.push(p.headIconUrl || "");
+        });
+        this.setMetadata(Object.assign(Object.assign({}, this.metadata), { playerCount: this.state.players.size, headIcons: JSON.stringify(headIcons) }));
+    }
     onJoin(client, options) {
         // Check custom limit
         if (this.state.players.size >= this.customMaxPlayers) {
@@ -168,14 +175,14 @@ class GameRoom extends colyseus_1.Room {
         player.displayName = options.displayName || options.name || "Player";
         player.joinOrder = this.state.players.size; // Assign join order based on current player count
         this.state.players.set(client.sessionId, player);
-        // Update metadata with player count
-        this.setMetadata(Object.assign(Object.assign({}, this.metadata), { playerCount: this.state.players.size }));
+        // Update metadata with player count and icons
+        this.updatePlayerMetadata();
     }
     onLeave(client, consented) {
         console.log(client.sessionId, "left!");
         this.state.players.delete(client.sessionId);
-        // Update metadata with player count
-        this.setMetadata(Object.assign(Object.assign({}, this.metadata), { playerCount: this.state.players.size }));
+        // Update metadata with player count and icons
+        this.updatePlayerMetadata();
     }
     onDispose() {
         console.log("room", this.roomId, "disposing...");

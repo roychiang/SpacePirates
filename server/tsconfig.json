@@ -9,7 +9,8 @@
         "target": "es2016",
         "esModuleInterop": true,
         "emitDecoratorMetadata": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "skipLibCheck": true
     },
     "include": [
         "src/**/*"
