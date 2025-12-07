@@ -24,8 +24,19 @@ gameServer.define("game_room", GameRoom_1.GameRoom)
     .enableRealtimeListing();
 function tokenGuard(token) {
     return (req, res, next) => {
-        const value = req.query.token || req.headers["x-monitor-token"];
-        if (value === token)
+        // 1. Check Query Param & Set Cookie
+        if (req.query.token === token) {
+            res.cookie("monitor_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production" });
+            return next();
+        }
+        // 2. Check Cookie
+        const cookieHeader = req.headers.cookie || "";
+        if (cookieHeader.includes(`monitor_token=${token}`)) {
+            return next();
+        }
+        // 3. Check Header (for programmatic access)
+        const headerValue = req.headers["x-monitor-token"];
+        if (headerValue === token)
             return next();
         return res.status(403).send("Forbidden");
     };
