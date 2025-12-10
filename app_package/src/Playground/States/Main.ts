@@ -19,11 +19,11 @@ export class Main extends State {
     public exit() {
         super.exit();
         if (this._playersTimer) { window.clearInterval(this._playersTimer); this._playersTimer = undefined as any; }
-        if (this._adt && this._playersOnlineText) { 
+        if (this._adt && this._playersOnlineText) {
             const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
             const t = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline");
             if (t) avatarGrid.removeControl(t);
-            this._playersOnlineText = undefined; 
+            this._playersOnlineText = undefined;
         }
     }
 
@@ -36,7 +36,7 @@ export class Main extends State {
 
         Main.diorama?.setEnable(this._adt);
 
-        playService.newMatchmakingClient("4p4wmv9d5z", true).then(() => {}).catch(() => {});
+        playService.newMatchmakingClient("4p4wmv9d5z", true).then(() => { }).catch(() => { });
 
         if (GuiFramework.isLandscape) {
             GuiFramework.createBottomBar(this._adt);
@@ -115,7 +115,16 @@ export class Main extends State {
                 State.setCurrent(States.credits);
             });
             this._adt.addControl(grid);
-            const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+            const existingAvatar = this._adt.getControlByName("globalAvatarGrid");
+            if (existingAvatar) {
+                existingAvatar.dispose();
+            }
+            // Remove from global overlay if present to avoid duplication/fading issues
+            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalAvatarGrid");
+            if (overlayAvatar) overlayAvatar.dispose();
+
+            // Force creation on this._adt to ensure it is on top of the Diorama fading layer
+            const avatarGrid = GuiFramework.createTopLeftAvatar(this._adt);
 
             // Check VIVERSE Auth
             authService.checkAuth().then(async (info) => {
@@ -132,12 +141,10 @@ export class Main extends State {
                     const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                     if (!isViverseDomain) {
                         console.log("[Main] User not logged in, showing login button");
-                        GuiFramework.attachLoginButton(() => {
-                            console.log("[Main] Login clicked");
-                            authService.loginWithWorlds();
-                        });
+                        // Login button temporarily disabled
+                        // GuiFramework.attachLoginButton(() => { ... });
                     } else {
-                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
+                        console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
                 }
             }).catch((e) => {
@@ -145,10 +152,8 @@ export class Main extends State {
                 const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                 if (!isViverseDomain) {
                     console.log("[Main] User checkAuth failed, showing login button");
-                    GuiFramework.attachLoginButton(() => {
-                        console.log("[Main] Login clicked");
-                        authService.loginWithWorlds();
-                    });
+                    // Login button temporarily disabled
+                    // GuiFramework.attachLoginButton(() => { ... });
                 }
             });
 
@@ -185,8 +190,8 @@ export class Main extends State {
                             this._playersOnlineText.text = "";
                             this._playersOnlineText.text = `Players Online: ${total}`;
                         }
-                    } catch {}
-                }).catch(() => {});
+                    } catch { }
+                }).catch(() => { });
             };
             updatePlayers();
             if (this._playersTimer) { window.clearInterval(this._playersTimer); }
@@ -263,7 +268,16 @@ export class Main extends State {
                 State.setCurrent(States.credits);
             });
             this._adt.addControl(panel);
-            const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+            const existingAvatar = this._adt.getControlByName("globalAvatarGrid");
+            if (existingAvatar) {
+                existingAvatar.dispose();
+            }
+            // Remove from global overlay if present to avoid duplication/fading issues
+            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalAvatarGrid");
+            if (overlayAvatar) overlayAvatar.dispose();
+
+            // Force creation on this._adt to ensure it is on top of the Diorama fading layer
+            const avatarGrid = GuiFramework.createTopLeftAvatar(this._adt);
 
             // Check VIVERSE Auth (Portrait)
             authService.checkAuth().then(async (info) => {
@@ -280,12 +294,10 @@ export class Main extends State {
                     const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                     if (!isViverseDomain) {
                         console.log("[Main] User not logged in, showing login button");
-                        GuiFramework.attachLoginButton(() => {
-                            console.log("[Main] Login clicked");
-                            authService.loginWithWorlds();
-                        });
+                        // Login button temporarily disabled
+                        // GuiFramework.attachLoginButton(() => { ... });
                     } else {
-                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
+                        console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
                 }
             }).catch((e) => {
@@ -293,10 +305,8 @@ export class Main extends State {
                 const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                 if (!isViverseDomain) {
                     console.log("[Main] User checkAuth failed, showing login button");
-                    GuiFramework.attachLoginButton(() => {
-                        console.log("[Main] Login clicked");
-                        authService.loginWithWorlds();
-                    });
+                    // Login button temporarily disabled
+                    // GuiFramework.attachLoginButton(() => { ... });
                 }
             });
 
@@ -330,8 +340,8 @@ export class Main extends State {
                         });
                         const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0);
                         if (this._playersOnlineText) this._playersOnlineText.text = `Players Online: ${total}`;
-                    } catch {}
-                }).catch(() => {});
+                    } catch { }
+                }).catch(() => { });
             };
             updatePlayers();
             if (this._playersTimer) { window.clearInterval(this._playersTimer); }
@@ -349,15 +359,15 @@ export class Main extends State {
         if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
         // Set initial state
         if (playService.voiceManager.isMuted()) {
-             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+            muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
         }
         muteBtn.onPointerClickObservable.add(() => {
-             const isMuted = playService.voiceManager.toggleMute();
-             if (isMuted) {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
-             } else {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
-             }
+            const isMuted = playService.voiceManager.toggleMute();
+            if (isMuted) {
+                muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
+            } else {
+                muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
+            }
         });
         this._adt.addControl(muteBtn);
 
