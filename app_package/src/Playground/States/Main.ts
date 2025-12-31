@@ -169,7 +169,13 @@ export class Main extends State {
                             const sameGame = !!(r.properties && r.properties["gameId"] === "SpacePirates");
                             return sameApp || sameGame;
                         });
-                        const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0);
+                        const total = filtered.reduce((acc: number, r: any) => {
+                            let count = (Array.isArray(r.actors) ? r.actors.length : 0);
+                            if (count === 0 && r.properties && (r.properties.playing || r.properties.game_started || r.is_closed)) {
+                                count = (r.max_players || 4);
+                            }
+                            return acc + count;
+                        }, 0);
                         if (this._playersOnlineText) {
                             this._playersOnlineText.text = "";
                             this._playersOnlineText.text = `Players Online: ${total}`;

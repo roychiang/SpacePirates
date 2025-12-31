@@ -608,24 +608,26 @@ export class HUD {
                     label.text = playService.getRoom()?.actors.find(a => parseInt(String(a.properties?.joinOrder ?? "-1"), 10) === shipIndex)?.name || "Player " + (shipIndex + 1);
                     label.color = (ship.faction === localFaction) ? "#4f73ff" : "#ff4f4f";
                     
-                    const linkTarget: any = ship.shipMesh || ship.root;
-                    if (linkTarget && typeof linkTarget.isEnabled === "function" && linkTarget.isEnabled()) {
-                        label.isVisible = true;
-                        label.linkWithMesh(linkTarget);
-                        label.linkOffsetY = -50;
-                    } else {
-                        label.isVisible = false;
-                    }
+                    label.isVisible = true;
+                    // label.linkWithMesh(linkTarget);
+                    // label.linkOffsetY = -50;
                 } else {
                     // Show DEAD status
                     label.text = (playService.getRoom()?.actors.find(a => parseInt(String(a.properties?.joinOrder ?? "-1"), 10) === shipIndex)?.name || "Player " + (shipIndex + 1)) + " (DEAD)";
                     label.color = "#ff0000";
                     label.isVisible = true;
-                    const linkTarget: any = ship.shipMesh || ship.root;
-                    if (linkTarget) {
-                        label.linkWithMesh(linkTarget);
-                        label.linkOffsetY = -50;
-                    }
+                    // const linkTarget: any = ship.shipMesh || ship.root;
+                    // if (linkTarget) {
+                    //    label.linkWithMesh(linkTarget);
+                    //    label.linkOffsetY = -50;
+                    // }
+                }
+
+                // Manually update position to handle off-screen clamping
+                if (localShip && localShip.shipCamera) {
+                    this._updateLabelPosition(engine, localShip.shipCamera.getFreeCamera(), ship.root.position, label);
+                } else if (engine.getScene().activeCamera) {
+                    this._updateLabelPosition(engine, engine.getScene().activeCamera!, ship.root.position, label);
                 }
             } else {
                 const label = this._playerLabels.get(shipIndex);
@@ -802,6 +804,60 @@ export class HUD {
         
         if (t < -h + 20) { t = -h + 20; clamped = true; }
         else if (t > h - 20) { t = h - 20; clamped = true; }
+
+        control.left = l;
+        control.top = t;
+        control.isVisible = true;
+    }
+
+    private _updateLabelPosition(engine: Engine, camera: Camera, position: Vector3, control: Control): void {
+        const w = (engine.getRenderWidth() * 0.5);
+        const h = engine.getRenderHeight() * 0.5;
+
+        var spo0 = Vector4.TransformCoordinates(position, camera.getViewMatrix());
+        var spo1 = Vector4.TransformCoordinates(new Vector3(spo0.x, spo0.y, spo0.z), camera.getProjectionMatrix());
+
+        spo1.x /= spo1.w;
+        spo1.y /= spo1.w;
+        var l = spo1.x * w;
+        var t = -spo1.y * h;
+        
+        const isBehind = spo0.z < 0; 
+        if (isBehind) {
+             l = -l;
+             t = -t;
+        }
+
+        const margin = 20;
+        const limitW = w - margin;
+        const limitH = h - margin;
+        
+        const isOffScreen = isBehind || Math.abs(l) > limitW || Math.abs(t) > limitH;
+
+        if (isOffScreen) {
+            const absL = Math.abs(l);
+            const absT = Math.abs(t);
+            
+            let scale = 1.0;
+            if (absL * limitH > absT * limitW) {
+                scale = limitW / absL;
+            } else {
+                scale = limitH / absT;
+            }
+            
+            if (l === 0 && t === 0 && isBehind) {
+                 t = limitH; 
+            } else {
+                 l *= scale;
+                 t *= scale;
+            }
+            // If off-screen, show near the arrow (which is at l, t)
+            // Arrow is 40x40. Put label below.
+            t += 30;
+        } else {
+            // On screen, standard offset above ship
+            t -= 50; 
+        }
 
         control.left = l;
         control.top = t;
