@@ -68,12 +68,12 @@ export class Main extends State {
             this.renderMainMenu();
 
             this._adt.addControl(grid);
-            const existingAvatar = this._adt.getControlByName("globalAvatarGrid");
+            const existingAvatar = this._adt.getControlByName("globalPlayerListPanel");
             if (existingAvatar) {
                 existingAvatar.dispose();
             }
             // Remove from global overlay if present to avoid duplication/fading issues
-            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalAvatarGrid");
+            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalPlayerListPanel");
             if (overlayAvatar) overlayAvatar.dispose();
 
             // Force creation on this._adt to ensure it is on top of the Diorama fading layer
@@ -281,12 +281,12 @@ export class Main extends State {
                 State.setCurrent(States.credits);
             });
             this._adt.addControl(panel);
-            const existingAvatar = this._adt.getControlByName("globalAvatarGrid");
+            const existingAvatar = this._adt.getControlByName("globalPlayerListPanel");
             if (existingAvatar) {
                 existingAvatar.dispose();
             }
             // Remove from global overlay if present to avoid duplication/fading issues
-            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalAvatarGrid");
+            const overlayAvatar = GuiFramework.globalOverlayAdt?.getControlByName("globalPlayerListPanel");
             if (overlayAvatar) overlayAvatar.dispose();
 
             // Force creation on this._adt to ensure it is on top of the Diorama fading layer
@@ -365,7 +365,7 @@ export class Main extends State {
                 playersText.height = "30px";
                 playersText.textWrapping = false;
                 playersText.topInPixels = 26;
-                avatarGrid.addControl(playersText, 1, 1);
+                avatarGrid.addControl(playersText);
             }
             this._playersOnlineText = playersText;
             const updatePlayers = () => {

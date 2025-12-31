@@ -436,6 +436,7 @@ export class PlayService {
     if (!this.room) return;
 
     // Detect left players
+    const leftActors: Actor[] = [];
     if (this.room.actors) {
         const newSessionIds = new Set<string>();
         state.players.forEach((p: any, sessionId: string) => {
@@ -444,10 +445,7 @@ export class PlayService {
         
         this.room.actors.forEach(actor => {
             if (!newSessionIds.has(actor.session_id)) {
-                console.log("[Play] Actor left:", actor);
-                this.emit("actorLeft", actor);
-                // Also close voice connection
-                this.voiceManager.closeConnection(actor.session_id);
+                leftActors.push(actor);
             }
         });
     }
@@ -474,6 +472,14 @@ export class PlayService {
       const aOrder = parseInt((a.properties?.joinOrder as string) || "0");
       const bOrder = parseInt((b.properties?.joinOrder as string) || "0");
       return aOrder - bOrder;
+    });
+
+    // Emit left events after updating local state so UI gets fresh list
+    leftActors.forEach(actor => {
+        console.log("[Play] Actor left:", actor);
+        this.emit("actorLeft", actor);
+        // Also close voice connection
+        this.voiceManager.closeConnection(actor.session_id);
     });
 
     // Determine host as the lowest joinOrder among active players

@@ -124,7 +124,8 @@ export class Matchmaking extends State {
             if (count === 0 && r.properties && (r.properties.playing || r.properties.game_started || r.is_closed)) {
                 // Heuristic: If playing/full but actors list is empty, assume max players (default 4) or 1
                 // to ensure we don't show "0" for an active game.
-                count = (r.max_players || 4);
+                const max = (r.metadata && r.metadata.max_players) || (r.properties && r.properties.max_players) || r.max_players || 4;
+                count = max;
             }
             return acc + count;
         }, 0)
@@ -206,8 +207,9 @@ export class Matchmaking extends State {
       await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
       const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
       const target = (this.listedRooms || []).find(r => r.id === rid)
+      const max = target ? ((target.metadata && target.metadata.max_players) || (target.properties && target.properties.max_players) || target.max_players || 4) : 4;
       if (target && (
-          (Array.isArray(target.actors) && target.actors.length >= (target.max_players || 4)) ||
+          (Array.isArray(target.actors) && target.actors.length >= max) ||
           (target.properties && (target.properties.playing || target.properties.game_started))
          )) {
         console.log("[UI] join blocked: room full or playing", { id: rid })
@@ -349,7 +351,10 @@ export class Matchmaking extends State {
     const appId = playService.getAppId()
     const byOwner: Record<string, any> = {}
     for (const rr of uniqueRooms) {
-      if (rr.app_id !== appId) continue
+      const sameApp = typeof rr.app_id === "string" ? (rr.app_id === appId) : false
+      const sameGame = !!(rr.properties && rr.properties["gameId"] === "SpacePirates")
+      if (!sameApp && !sameGame) continue
+
       const ownerKey = String((rr.name) || (rr.properties && rr.properties["owner"]) || rr.master_client_id || rr.id)
       const current = byOwner[ownerKey]
       if (!current) {
@@ -385,7 +390,8 @@ export class Matchmaking extends State {
       const actorList = (r.actors || [])
       console.log("[UI] Room row:", { id: r.id, actors: actorList.length, playing: r.properties?.playing, started: r.properties?.game_started })
       // Enforce 4-player limit for UI status
-      const canJoinRow = !r.is_closed && actorList.length < (r.max_players || 4) && !(r.properties && (r.properties.playing || r.properties.game_started))
+      const max = (r.metadata && r.metadata.max_players) || (r.properties && r.properties.max_players) || r.max_players || 4;
+      const canJoinRow = !r.is_closed && actorList.length < max && !(r.properties && (r.properties.playing || r.properties.game_started))
       row.addControl(container, 0, 0)
       const cb = new Checkbox()
       cb.isChecked = this.selectedRoomId === r.id
@@ -456,7 +462,7 @@ export class Matchmaking extends State {
       
       if (isPlaying) {
           statusText = "Playing";
-      } else if (actorList.length >= (r.max_players || 4) || r.is_closed) {
+      } else if (actorList.length >= max || r.is_closed) {
           statusText = "Full";
       }
 
@@ -474,8 +480,9 @@ export class Matchmaking extends State {
   private updateJoinButtonState() {
     const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
     const target = (this.listedRooms || []).find(r => r.id === rid)
+    const max = target ? ((target.metadata && target.metadata.max_players) || (target.properties && target.properties.max_players) || target.max_players || 4) : 4;
     const canJoin = !!target && !target.is_closed && 
-                    ((target.actors || []).length < (target.max_players || 4)) && 
+                    ((target.actors || []).length < max) && 
                     !(target.properties && (target.properties.playing || target.properties.game_started))
     if (this.joinBtn) this.joinBtn.isEnabled = canJoin
   }

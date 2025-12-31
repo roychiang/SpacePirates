@@ -113,8 +113,27 @@ export class Lobby extends State {
       playersText.topInPixels = 26
       avatarGrid.addControl(playersText, 1, 1)
     }
-    // Hook into refresh to detect new players and reset timer (Host only)
-    const updatePlayers = () => {
+    
+    // Initial update
+    this.updateGlobalPlayerList(avatarGrid);
+
+    playService.ensureActorPresentInRoom().then(() => this.refresh())
+      ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
+      ; (playService as any).off?.("actorJoined", this.onActorJoined)
+      ; (playService as any).off?.("actorLeft", this.onActorLeft)
+      ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
+    playService.on("roomUpdated", this.onRoomUpdated)
+    playService.on("actorJoined", this.onActorJoined)
+    playService.on("actorLeft", this.onActorLeft)
+    playService.on("readyStateChanged", this.onReadyChanged)
+    this.loadStatus()
+    
+    // Polling fallback to ensure lobby updates even if events are missed
+    if (this.refreshTimer) window.clearInterval(this.refreshTimer)
+    this.refreshTimer = window.setInterval(() => this.refresh(), 3000)
+  }
+
+  private updateGlobalPlayerList(avatarGrid: any) {
       // Refresh top left list with ALL actors
       if (playService.getRoom() && playService.getRoom()!.actors) {
           const actors = playService.getRoom()!.actors.map(a => ({
@@ -145,27 +164,17 @@ export class Lobby extends State {
             t.text = `Players Online: ${displayTotal}`
         }
       }).catch(() => {})
-    }
-    updatePlayers()
-    if (this.refreshTimer) window.clearInterval(this.refreshTimer)
-    this.refreshTimer = window.setInterval(() => { this.refresh(); updatePlayers(); }, 2000)
-
-    playService.ensureActorPresentInRoom().then(() => this.refresh())
-      ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
-      ; (playService as any).off?.("actorJoined", this.onActorJoined)
-      ; (playService as any).off?.("actorLeft", this.onActorLeft)
-      ; (playService as any).off?.("readyStateChanged", this.onReadyChanged)
-    playService.on("roomUpdated", this.onRoomUpdated)
-    playService.on("actorJoined", this.onActorJoined)
-    playService.on("actorLeft", this.onActorLeft)
-    playService.on("readyStateChanged", this.onReadyChanged)
-    this.loadStatus()
-    // Polling fallback to ensure lobby updates even if events are missed
-    this.refreshTimer = window.setInterval(() => this.refresh(), 3000)
   }
 
   private async refresh() {
     if (this.isStarting) return
+    
+    // Also update global player list
+    if (this._adt) {
+        const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+        this.updateGlobalPlayerList(avatarGrid);
+    }
+
     const res = await playService.getMyRoomActors()
     // Check if disposed after await
     if (!this.playersPanel || !this._adt) return

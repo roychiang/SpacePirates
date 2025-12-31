@@ -23,7 +23,7 @@ export class GameState extends Schema {
 }
 
 export class GameRoom extends Room<GameState> {
-    maxClients = 4;
+    maxClients = 32;
     customMaxPlayers = 4;
     playerKills = new Map<string, number>();
     killedEnemies = new Set<number>();
@@ -45,6 +45,7 @@ export class GameRoom extends Room<GameState> {
         // Set room metadata for listing (includes game_mode for PVP/Co-op filtering)
         const metadata: any = {
             name: options.name || "Game Room",
+            max_players: this.customMaxPlayers,
             game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop"
         };
         

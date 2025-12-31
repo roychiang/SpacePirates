@@ -270,24 +270,23 @@ export class GuiFramework {
         // Clear existing children except potentially "Players Online" text if it was added manually?
         // Main.ts adds "playersOnlineText" to the container.
         // We should preserve controls that are NOT player entries.
-        // Player entries start with "pEntry_".
-        // Or we just rebuild everything.
-        // Main.ts adds control to "globalAvatarGrid".
-        // We need to support Main.ts finding "globalAvatarGrid".
-        // We renamed main container to "globalPlayerListPanel".
-        // Let's alias the first entry as "globalAvatarGrid" if it's the local player?
-        // Or better: Let Main.ts find "globalPlayerListPanel".
+        // Player entries start with "pEntry_" or "globalAvatar"
         
-        // Rebuild
-        // We need to keep the "Players Online" text if it exists.
+        // Filter out controls to keep
         const extras: Control[] = [];
         panel.children.forEach(c => {
-             if (c.name === "globalPlayersOnline") {
+             // Keep "globalPlayersOnline" and potentially other UI elements not related to player list
+             if (c.name === "globalPlayersOnline" || (!c.name.startsWith("globalAvatar") && !c.name.startsWith("pEntry_"))) {
                  extras.push(c);
              }
         });
         
         panel.clearControls();
+
+        // Restore extras
+        extras.forEach(c => {
+            panel.addControl(c);
+        });
         
         players.forEach((p, index) => {
             // Use specific ID for first player to match legacy "globalAvatarName" lookups if needed

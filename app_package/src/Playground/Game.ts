@@ -652,7 +652,10 @@ export class Game {
                  name: a.name,
                  url: (a.properties?.headIconUrl as string) || ""
              }));
-             GuiFramework.updateTopLeftAvatar(actors);
+             // Heuristic: If actors list is empty but we have max_players, maybe we can't see them?
+             // But updatePlayerList is called on actorJoined, so we should have actors.
+             
+             // GuiFramework.updateTopLeftAvatar(actors);
         }
     }
 

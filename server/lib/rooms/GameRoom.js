@@ -107,7 +107,7 @@ __decorate([
 class GameRoom extends colyseus_1.Room {
     constructor() {
         super(...arguments);
-        this.maxClients = 4;
+        this.maxClients = 32; // Keep high to prevent auto-lock; use customMaxPlayers for logic
         this.customMaxPlayers = 4;
         this.playerKills = new Map();
         this.killedEnemies = new Set();
@@ -127,7 +127,8 @@ class GameRoom extends colyseus_1.Room {
         // Set room metadata for listing (includes game_mode for PVP/Co-op filtering)
         const metadata = {
             name: options.name || "Game Room",
-            game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop"
+            game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop",
+            max_players: this.customMaxPlayers
         };
         if (options.properties) {
             console.log("Initializing room properties:", options.properties);

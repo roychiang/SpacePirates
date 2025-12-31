@@ -383,6 +383,76 @@ export class HUD {
         GuiFramework.setFont(this._alliesRemainingLabel, true, true);
         this._aiCounterGrid.addControl(this._alliesRemainingLabel, 1, 0);
 
+        // Fix for HUD crash: Ensure engine.getScene exists or fallback
+        // The error `engine.getScene is not a function` suggests `engine` passed to tick might be a ThinEngine or incompatible.
+        // However, looking at Game.ts:551: `this._HUD.tick(scene.getEngine(), ...)`
+        // `scene.getEngine()` returns `Engine` which inherits from `ThinEngine`.
+        // `getScene` is not on `ThinEngine` or `Engine` in some versions? 
+        // Actually `Engine` does not have `getScene` method usually? 
+        // It's `engine.scenes` array. 
+        // The crash happened in `HUD.js:563` which maps to `HUD.ts` `_computeScreenCoord`.
+        // Let's check `_computeScreenCoord`. It uses `engine.getRenderWidth()`.
+        // The error log said `engine.getScene is not a function`. 
+        // I don't see `engine.getScene()` usage in `HUD.ts`. 
+        // Wait, maybe it's in a hidden getter or internal Babylon call?
+        // "Uncaught TypeError: engine.getScene is not a function at eval (HUD.js:563:33)"
+        // HUD.js:563 is likely inside `_computeScreenCoord`.
+        // If `engine` is `ThinEngine`, it has `getRenderWidth`.
+        // Let's look at `HUD.ts` imports. `Engine` from `@babylonjs/core`.
+        // Maybe the `engine` passed is actually something else?
+        // In Game.ts: `scene.getEngine()`.
+        
+        // Wait, I see `engine.getFps()` in `tick` method (commented out).
+        // Let's check if I added any `getScene` call? No.
+        // Maybe `Vector4.TransformCoordinates` or `camera.getViewMatrix()` triggers something?
+        
+        // Re-reading log:
+        // HUD.js:563  Uncaught TypeError: engine.getScene is not a function
+        // at eval (HUD.js:563:33)
+        // at Array.forEach (<anonymous>)
+        // at HUD.tick (HUD.js:512:33)
+        
+        // 563 is likely in `_computeScreenCoord` or loop.
+        // Let's look at `_computeScreenCoord` again.
+        // It uses `Vector4.TransformCoordinates`.
+        // Maybe the error is misleading or from a different version?
+        // Or maybe I am using an object that looks like engine but isn't?
+        
+        // Actually, looking at the code I read:
+        // line 204: `//this._fpsCounter.text = engine.getFps().toFixed() + " fps";`
+        // line 221: `private _computeScreenCoord(engine: Engine, ...)`
+        
+        // If the error persists, it might be due to a specific BabylonJS version issue or a mix-up.
+        // But to be safe, I will ensure we don't call anything weird.
+        // The user pointed to crash at `p1.log#L1-900`.
+        // The log shows: `HUD.js:563 Uncaught TypeError: engine.getScene is not a function`.
+        // This suggests `HUD.js` (compiled JS) has this call.
+        // Maybe `engine` is not what we think it is.
+        // In `Game.ts`, `scene.getEngine()` returns the engine.
+        
+        // Wait, I don't see `engine.getScene` in my `HUD.ts`.
+        // Is it possible `HUD.ts` was not matching the `HUD.js` in the log?
+        // The log is from `p1.log`, which is a runtime log.
+        // Maybe the `HUD.js` on the server/client has code I don't see here?
+        // Ah, `HUD.js` line 563. 
+        // In `HUD.ts`, `_computeScreenCoord` starts at 221. 
+        // The file I read has 303 lines + more.
+        
+        // Let's assume the error is real and maybe related to `engine` usage.
+        // I will replace `engine.getRenderWidth()` with `engine.getRenderWidth(true)` just in case,
+        // and add a check.
+        // But `getScene` is the key. 
+        // `Engine` class usually doesn't have `getScene`. `Scene` has `getEngine`.
+        // Maybe some Babylon internal helper attached to `engine`?
+        
+        // Let's look at `HUD.ts` again.
+        // I see `Vector4.TransformCoordinates`.
+        
+        // Hypotheis: The user's `HUD.js` has `engine.getScene()` call which I don't see in `HUD.ts`?
+        // Or maybe I missed it.
+        // I will search for `getScene` in `HUD.ts` using Grep later if needed.
+        // But for now, I will assume the `engine` parameter in `tick` is fine.
+        
         this._enemiesRemaining = new TextBlock("enemiesRemaining");
         this._enemiesRemaining.color = "white";
         if (InputManager.isTouch) {
@@ -498,6 +568,19 @@ export class HUD {
 
         // Task 2: Display other players' usernames
         const grid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+
+        // Clear standard lobby avatar entries (Blue list) to avoid duplication with HUD list (Red list)
+        // Keep only HUD specific panels if they exist (though this is init, so they shouldn't)
+        // We iterate backwards to safely remove
+        for (let i = grid.children.length - 1; i >= 0; i--) {
+            const child = grid.children[i];
+            // Remove standard avatar entries (globalAvatar... or pEntry_...) and players online text
+            // Keep teammatesPanel if it somehow exists
+            if (child.name !== "teammatesPanel") {
+                child.dispose();
+            }
+        }
+
         let teammatesPanel = grid.children.find(c => c.name === "teammatesPanel") as StackPanel;
         if (!teammatesPanel) {
             teammatesPanel = new StackPanel("teammatesPanel");
@@ -506,7 +589,7 @@ export class HUD {
             teammatesPanel.isHitTestVisible = false;
             // Offset below name? Name is at (0,1). Row 0 height is 80. 
             teammatesPanel.topInPixels = 10; 
-            grid.addControl(teammatesPanel, 1, 1);
+            grid.addControl(teammatesPanel);
         }
         teammatesPanel.clearControls();
         
@@ -548,7 +631,8 @@ export class HUD {
         }
     }
 
-    tick(engine: Engine, gameSpeed: number, players: Array<Ship>) {
+    public tick(engine: Engine, gameSpeed: number, players: Array<Ship>) {
+        if (!this._adt) return;
         this._parameters.isVisible = Settings.showParameters;
         let enemyCount = 0, allyCount = 0;
         const actors = playService.getRoom()?.actors || [];
@@ -626,8 +710,8 @@ export class HUD {
                 // Manually update position to handle off-screen clamping
                 if (localShip && localShip.shipCamera) {
                     this._updateLabelPosition(engine, localShip.shipCamera.getFreeCamera(), ship.root.position, label);
-                } else if (engine.getScene().activeCamera) {
-                    this._updateLabelPosition(engine, engine.getScene().activeCamera!, ship.root.position, label);
+                } else if (this._adt.getScene().activeCamera) {
+                    this._updateLabelPosition(engine, this._adt.getScene().activeCamera!, ship.root.position, label);
                 }
             } else {
                 const label = this._playerLabels.get(shipIndex);
