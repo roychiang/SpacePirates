@@ -1,6 +1,7 @@
 import { Control, Grid, StackPanel, Button, TextBlock, InputText, Ellipse, Image, Rectangle, Checkbox } from "@babylonjs/gui"
 import { Parameters } from "../Parameters"
-import { State } from "./State"
+import { Config } from "../../Config";
+import { State } from "./State";
 import { States } from "./States"
 import { GuiFramework } from "../GuiFramework"
 import { Assets } from "../Assets"
@@ -25,8 +26,8 @@ export class Matchmaking extends State {
     super.enter()
     if (!this._adt) return
     const adt = this._adt
-    authService.initClient({ clientId: "4p4wmv9d5z", domain: "account.htcvive.com", cookieDomain: window.location.hostname })
-    playService.newMatchmakingClient("4p4wmv9d5z", true).then(() => {
+    authService.initClient({ clientId: Config.VIVERSE_CLIENT_ID, domain: "account.htcvive.com", cookieDomain: window.location.hostname })
+    playService.newMatchmakingClient(Config.VIVERSE_CLIENT_ID, true).then(() => {
       ; (playService as any).off?.("connected", this.onConnected)
         ; (playService as any).off?.("roomListUpdated", this.onRoomListUpdated)
       playService.on("connected", this.onConnected)
@@ -47,7 +48,6 @@ export class Matchmaking extends State {
     root.addControl(panel, 0, 0)
     const content = GuiFramework.createTextPanel(root)
     GuiFramework.createPageTitle(this.pvpMode ? "SELECT ROOM [PVP]" : "SELECT ROOM [CO-OP]", content)
-    console.log("[UI] SDK", !!getViverse(), "TOKEN", false)
     this.roomsPanel = new StackPanel()
     this.roomsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
     content.addControl(this.roomsPanel, 1, 1)

@@ -409,7 +409,6 @@ export class PlayService {
 
   private setupRoomHandlers(room: Colyseus.Room) {
     room.onStateChange((state: any) => {
-      console.log("Room state changed:", state);
       this.syncState(state);
     });
 
@@ -423,12 +422,10 @@ export class PlayService {
     room.onMessage("leaderboardData", (msg) => this.emit("leaderboardData", msg));
 
     room.onLeave((code: number) => {
-      console.warn("[Play] Colyseus room left", code);
       this.voiceManager.leave();
     });
 
     room.onError((code: number, message?: string) => {
-      console.error("[Play] Colyseus room error", { code, message });
     });
   }
 
@@ -476,7 +473,6 @@ export class PlayService {
 
     // Emit left events after updating local state so UI gets fresh list
     leftActors.forEach(actor => {
-        console.log("[Play] Actor left:", actor);
         this.emit("actorLeft", actor);
         // Also close voice connection
         this.voiceManager.closeConnection(actor.session_id);

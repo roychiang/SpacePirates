@@ -82,7 +82,6 @@ export class Main extends State {
             // Check VIVERSE Auth
             authService.checkAuth().then(async (info) => {
                 if (info) {
-                    console.log("[Main] User logged in:", info);
                     try {
                         const profile = await avatarService.getProfile();
                         GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl);
@@ -95,17 +94,13 @@ export class Main extends State {
                             properties: { headIconUrl: profile.activeAvatar?.headIconUrl || "" }
                         });
                     } catch (e) {
-                        console.warn("[Main] Failed to get profile", e);
                         GuiFramework.updateTopLeftAvatar("Player");
                     }
                 } else {
                     const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                     if (!isViverseDomain) {
-                        console.log("[Main] User not logged in, showing login button");
                         // Login button temporarily disabled
                         // GuiFramework.attachLoginButton(() => { ... });
-                    } else {
-                        console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
                     
                     // Set Guest Actor
@@ -119,7 +114,6 @@ export class Main extends State {
                     }
                 }
             }).catch((e) => {
-                console.warn("[Main] checkAuth failed", e);
                 // Set Guest Actor on failure too
                 if (!playService.getActor()) {
                     const guestId = "Guest_" + Math.floor(Math.random() * 100000);
@@ -128,14 +122,6 @@ export class Main extends State {
                         name: guestId,
                         properties: {}
                     });
-                    TaloClient.identify(guestId);
-                }
-
-                const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
-                if (!isViverseDomain) {
-                    console.log("[Main] User checkAuth failed, showing login button");
-                    // Login button temporarily disabled
-                    // GuiFramework.attachLoginButton(() => { ... });
                 }
             });
 
@@ -203,7 +189,7 @@ export class Main extends State {
             logo.top = "150px";
             this._adt.addControl(logo);
 
-            Main.playButton = GuiFramework.addButton("Single Play", panel);
+            Main.playButton = GuiFramework.addButton("SINGLE", panel);
             Main.playButton.isVisible = Assets.loadingComplete;
 
             Main.playButton.onPointerDownObservable.add(function (info) {
@@ -212,7 +198,6 @@ export class Main extends State {
                 gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
                 gameDefinition.aiEnemies = Parameters.enemyCount;
                 gameDefinition.aiAllies = Parameters.allyCount;
-                console.log("[Main] Play clicked (portrait). allowSplitScreen=", Parameters.allowSplitScreen, "humanAllies=", gameDefinition.humanAllies, "aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                 BattleSelect.gameDefinition = gameDefinition;
                 State.setCurrent(States.battleSelect);
             });
@@ -332,7 +317,6 @@ export class Main extends State {
                     }
                 }
             }).catch((e) => {
-                console.warn("[Main] checkAuth failed", e);
                 // Set Guest Actor
                 if (!playService.getActor()) {
                     const guestId = "Guest_" + Math.floor(Math.random() * 100000);
@@ -344,7 +328,6 @@ export class Main extends State {
                 }
                 const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                 if (!isViverseDomain) {
-                    console.log("[Main] User checkAuth failed, showing login button");
                     // Login button temporarily disabled
                     // GuiFramework.attachLoginButton(() => { ... });
                 }
@@ -418,16 +401,16 @@ export class Main extends State {
         this._panel.clearControls();
 
         // Single Play
-        Main.playButton = GuiFramework.addButton("Single Play", this._panel);
-        Main.playButton.isVisible = Assets.loadingComplete;
-        Main.playButton.onPointerDownObservable.add(() => {
-             const gameDefinition = new GameDefinition();
-             gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
-             gameDefinition.aiEnemies = Parameters.enemyCount;
-             gameDefinition.aiAllies = Parameters.allyCount;
-             BattleSelect.gameDefinition = gameDefinition;
-             State.setCurrent(States.battleSelect);
-        });
+            Main.playButton = GuiFramework.addButton("Single", this._panel);
+            Main.playButton.isVisible = Assets.loadingComplete;
+            Main.playButton.onPointerDownObservable.add(() => {
+                 const gameDefinition = new GameDefinition();
+                 gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
+                 gameDefinition.aiEnemies = Parameters.enemyCount;
+                 gameDefinition.aiAllies = Parameters.allyCount;
+                 BattleSelect.gameDefinition = gameDefinition;
+                 State.setCurrent(States.battleSelect);
+            });
 
         // CO-OP
         GuiFramework.addButton("CO-OP", this._panel).onPointerDownObservable.add(() => {
@@ -457,7 +440,7 @@ export class Main extends State {
         this._panel.clearControls();
 
         // Leaderboard - Single Play
-        GuiFramework.addButton("Single Play", this._panel).onPointerDownObservable.add(() => {
+        GuiFramework.addButton("SINGLE", this._panel).onPointerDownObservable.add(() => {
              Leaderboard.leaderboardConfig = {
                  killsAlias: "TotalKillsSingle",
                  winsAlias: "TotalWinsSingle",

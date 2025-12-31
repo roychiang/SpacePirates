@@ -86,16 +86,8 @@ export class Game {
             gameDefinition.humanEnemies = 0;
             gameDefinition.aiEnemies = Parameters.enemyCount;
             gameDefinition.aiAllies = Parameters.allyCount;
-            console.log("Using default game definition");
         }
         this._gameDefinition = gameDefinition;
-        console.log("[Game] Starting with:", {
-            humanAllies: gameDefinition.humanAllies,
-            humanEnemies: gameDefinition.humanEnemies,
-            aiAllies: gameDefinition.aiAllies,
-            aiEnemies: gameDefinition.aiEnemies,
-            localPlayerIndex: this._localPlayerIndex
-        });
 
         const MaxShips = gameDefinition.humanAllies + gameDefinition.humanEnemies + gameDefinition.aiEnemies + gameDefinition.aiAllies;
         this._shotManager = new ShotManager(assets, scene, glowLayer);
@@ -143,7 +135,6 @@ export class Game {
 
                 // Ensure an input slot exists for this ship's control index
                 InputManager.getOrCreateInput(ship.controlIndex);
-                console.log('[Game] Ally ship spawned:', { spawnIndex: i, controlIndex: ship.controlIndex, isLocal: i === this._localPlayerIndex });
                 this.humanPlayerShips.push(ship);
 
                 // Only add camera for local player
@@ -263,7 +254,6 @@ export class Game {
             this.updatePlayerList();
             if (!p) return;
             const joinOrder = parseInt(p.properties?.joinOrder || "-1");
-            console.log("[Game] Player left, index:", joinOrder);
             
             if (joinOrder >= 0 && joinOrder < this.humanPlayerShips.length) {
                 // Remove from active players to trigger Host migration if needed
@@ -271,7 +261,6 @@ export class Game {
 
                 const ship = this.humanPlayerShips[joinOrder];
                 if (ship) {
-                    console.log("[Game] Removing ship for left player:", joinOrder);
                     ship.life = -1;
                     ship.shipMesh?.setEnabled(false);
                     ship.trail?.invalidate();
@@ -292,14 +281,12 @@ export class Game {
         playService.on("playerDied", (p: any) => {
             if (!p) return;
             const index = p.index;
-            console.log("[Game] Player died event received for index:", index);
             
             if (typeof index === "number" && index >= 0 && index < this.humanPlayerShips.length) {
                 // Ensure we don't destroy ourselves based on remote message if we are still alive locally?
                 // Actually, trust the server message. If server says died, they died.
                 const ship = this.humanPlayerShips[index];
                 if (ship && ship.isValid()) {
-                    console.log("[Game] Destroying ship for died player:", index);
                     // Use shipManager to destroy properly
                     this._shipManager.destroyShip(index);
                     // Ensure life is set to -1 immediately so HUD updates
@@ -485,7 +472,6 @@ export class Game {
                 const p2 = this.humanPlayerShips[1];
                 if (p1 && p1.life < 0 && p2 && p2.life >= 0) {
                      if (Math.random() < 0.02) {
-                         console.log(`[Game] P1 Dead, P2 Alive. Speed: ${this._speed}. TargetSpeed: ${this._targetSpeed}. P2 Pos: ${p2.root.position}. DeltaTime: ${deltaTime}`);
                      }
                 }
             }
@@ -498,7 +484,6 @@ export class Game {
 
             // Client-Side Death Reporting
             if (wasAlive && myShip && myShip.life <= 0) {
-                 console.log(`[Game] Local player ${this._localPlayerIndex} died. Notifying Host.`);
                  playService.notifyPlayerDeath(this._localPlayerIndex);
             }
 

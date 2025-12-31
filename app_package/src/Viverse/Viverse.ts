@@ -13,7 +13,6 @@ export function getViverse(): any {
     const fromParent = (w?.parent && w.parent !== w) ? (w.parent as any)?.viverse : undefined
     const fromTop = (w?.top && w.top !== w) ? (w.top as any)?.viverse : undefined
     if (!fromWindow && (fromParent || fromTop)) {
-      console.log("[SDK] using cross-frame viverse", { parent: !!fromParent, top: !!fromTop })
     }
     return fromWindow || fromParent || fromTop
   } catch {

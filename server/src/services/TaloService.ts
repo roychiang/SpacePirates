@@ -84,7 +84,6 @@ export class TaloService {
             // Talo leaderboards are typically "High Score" (keep best) by default.
             await this.submitToLeaderboard("HighScore", score, playerIdentifier);
         } catch (e) {
-            console.error("[TaloService] Failed to report score:", e);
         }
     }
 
@@ -99,35 +98,28 @@ export class TaloService {
             try {
                 const aliasId = await this.identifyAliasId(playerIdentifier);
                 const url = `${this.baseUrl}/leaderboards/${alias}/entries?page=0&aliasId=${encodeURIComponent(String(aliasId))}`;
-                console.log(`[TaloService] Fetching current score from: ${url}`);
-                const res = await fetch(url, {
-                    headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.entries && data.entries.length > 0) {
-                        const first = data.entries[0];
-                        currentScore = parseFloat(first?.score) || 0;
-                        console.log(`[TaloService] Found existing score for ${playerIdentifier} in ${alias}: ${currentScore}`);
-                    } else {
-                        console.log(`[TaloService] No entries found for ${alias}, starting from 0.`);
-                    }
-                } else {
-                    console.warn(`[TaloService] Fetch entries failed: ${res.status} ${res.statusText}`);
-                }
-            } catch (fetchErr) {
-                console.warn(`[TaloService] Failed to fetch current score for ${alias}, starting from 0. Error:`, fetchErr);
-            }
-
-            const newScore = currentScore + incrementBy;
-            console.log(`[TaloService] Incrementing ${alias}: ${currentScore} + ${incrementBy} = ${newScore}`);
+            const res = await fetch(url, {
+                headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
+            });
             
-            await this.submitToLeaderboard(alias, newScore, playerIdentifier);
-        } catch (e) {
-            console.error(`[TaloService] Failed to increment ${alias}`, e);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.entries && data.entries.length > 0) {
+                    const first = data.entries[0];
+                    currentScore = parseFloat(first?.score) || 0;
+                } else {
+                }
+            } else {
+            }
+        } catch (fetchErr) {
         }
+
+        const newScore = currentScore + incrementBy;
+        
+        await this.submitToLeaderboard(alias, newScore, playerIdentifier);
+    } catch (e) {
     }
+}
 
     static async getLeaderboardEntries(alias: string, identifier?: string) {
         try {
@@ -148,14 +140,12 @@ export class TaloService {
             
             if (!res.ok) {
                  const text = await res.text().catch(() => "");
-                 console.error(`[TaloService] Failed to fetch entries for ${alias}: ${res.status} ${res.statusText}`, text);
                  return { entries: [], error: `upstream ${res.status}` };
             }
 
             const data = await res.json();
             return data;
         } catch (e) {
-            console.error("[TaloService] getLeaderboardEntries failed", e);
             return { entries: [], error: (e as any)?.message ? String((e as any).message) : String(e) };
         }
     }
@@ -168,7 +158,6 @@ export class TaloService {
             const data = await res.json();
             return data.leaderboards || [];
         } catch (e) {
-            console.error("[TaloService] getLeaderboards failed", e);
             return [];
         }
     }
@@ -192,9 +181,7 @@ export class TaloService {
                 const text = await res.text().catch(() => "");
                 throw new Error(`Submit failed: ${res.status} ${res.statusText}${text ? ` - ${text}` : ""}`);
             }
-            console.log(`[TaloService] Updated leaderboard ${alias} with score ${score}`);
         } catch (e) {
-            console.error(`[TaloService] Failed to update leaderboard ${alias}`, e);
         }
     }
 

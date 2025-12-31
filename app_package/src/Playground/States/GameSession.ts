@@ -110,26 +110,20 @@ export class GameSession {
     }
 
     public pause(): void {
-        console.log("[GameSession] pause called")
         try {
             this._game?.getRecorder()?.setRecordActive(false);
             this._game?.setTargetSpeed(0);
         } catch (e) {
-            console.error("[GameSession] Error pausing game:", e);
         }
     }
 
     public resume(): void {
-        console.log("[GameSession] resume called")
         try {
             if (this._game) {
                 this._game.setTargetSpeed(1);
                 this._game.getRecorder()?.setRecordActive(true);
-            } else {
-                console.warn("[GameSession] resume called but game is null");
             }
         } catch (e) {
-            console.error("[GameSession] Error resuming game:", e);
         }
     }
 }

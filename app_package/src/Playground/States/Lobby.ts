@@ -324,7 +324,6 @@ export class Lobby extends State {
                     this.countdownText.text = "Starting...";
                  }
                  if (isOwner && !this.isStarting) {
-                     console.log("[Lobby] Countdown finished, Host starting game...");
                      // Bake configuration before starting
                      const count = Math.min(4, playerCount);
                      const aiAllies = Math.max(0, 4 - count);
@@ -340,7 +339,6 @@ export class Lobby extends State {
     } else {
         // Less than 2 players
         if (isOwner && targetTime > 0) {
-            console.log("[Lobby] Player count dropped < 2, clearing countdown.");
             playService.updateRoomProperties({ target_start_time: 0 });
         }
         if (this.countdownText) {
@@ -349,7 +347,6 @@ export class Lobby extends State {
     }
 
     if (isOwner && playerCount > this.lastPlayerCount && playerCount >= 2 && !this.isStarting) {
-         console.log(`[Lobby] Player count increased (${this.lastPlayerCount} -> ${playerCount}), resetting countdown.`);
          const now = Date.now();
          playService.updateRoomProperties({ target_start_time: now + 20000 });
     }
@@ -358,7 +355,6 @@ export class Lobby extends State {
     // Check if game has been started via room properties
     if (room && room.properties) {
       if (room.properties.game_started === true || room.properties.game_started === "true") {
-        console.log("[Lobby] Game started detected, transitioning to game")
         this.tryStart()
       }
     }
@@ -391,12 +387,10 @@ export class Lobby extends State {
   private async loadStatus() {
     const info = await authService.checkAuth()
     const token = info ? info.access_token : undefined
-    console.log("[Lobby] token", !!token)
     avatarService.init(token)
     const name = await authService.getDisplayName(token)
     const profile = await avatarService.getProfile()
     const url = avatarService.getHeadIconUrlOrDefault(profile)
-    console.log("[Lobby] avatar", { name, url })
     GuiFramework.updateTopLeftAvatar(name, url)
   }
 

@@ -33,7 +33,6 @@ export class GameRoom extends Room<GameState> {
     onCreate(options: any) {
         this.setState(new GameState());
 
-        console.log("GameRoom created with options:", options);
 
         // Store maxPlayers but keep maxClients high to prevent auto-lock hiding room
         if (options.maxPlayers) {
@@ -50,7 +49,6 @@ export class GameRoom extends Room<GameState> {
         };
         
         if (options.properties) {
-            console.log("Initializing room properties:", options.properties);
             Object.assign(metadata, options.properties);
             for (const key in options.properties) {
                 this.state.properties.set(key, String(options.properties[key]));
@@ -63,9 +61,7 @@ export class GameRoom extends Room<GameState> {
                     // Count enemies (assuming type 1 is enemy)
                     const enemies = aiConfig.filter((c: any) => c.type === 1).length;
                     this.state.totalEnemies = enemies;
-                    console.log(`[GameRoom] Set totalEnemies to ${enemies} based on ai_config`);
                 } catch (e) {
-                    console.error("[GameRoom] Failed to parse ai_config for enemy count", e);
                 }
             }
         }
@@ -75,7 +71,6 @@ export class GameRoom extends Room<GameState> {
              const fallback = Number(options.aiEnemies || (options.properties && options.properties.aiEnemies) || 10);
              if (fallback > 0) {
                  this.state.totalEnemies = fallback;
-                 console.log(`[GameRoom] Set totalEnemies to ${fallback} based on fallback options`);
              }
         }
         
@@ -86,7 +81,6 @@ export class GameRoom extends Room<GameState> {
         }
 
         this.setMetadata(metadata);
-        console.log("Room metadata set:", metadata);
 
         const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
         const finite = (v: any): v is number => typeof v === "number" && Number.isFinite(v);
@@ -312,7 +306,6 @@ export class GameRoom extends Room<GameState> {
 
         // Handle room properties update
         this.onMessage("updateRoomProperties", (client, message) => {
-            console.log("Updating room properties:", message);
             const newMetadata: any = { ...this.metadata };
             for (const key in message) {
                 const val = message[key];
@@ -335,13 +328,11 @@ export class GameRoom extends Room<GameState> {
                         this.playerKills.clear();
                     }
                 } catch (e) {
-                    console.error("[GameRoom] Failed to parse ai_config for enemy count", e);
                 }
             }
             try {
                 this.setMetadata(newMetadata);
             } catch (e) {
-                console.error("[GameRoom] Failed to set metadata:", e);
             }
         });
     }
@@ -364,7 +355,6 @@ export class GameRoom extends Room<GameState> {
             throw new Error("Room is full");
         }
 
-        console.log(client.sessionId, "joined!");
         const player = new Player();
         player.sessionId = client.sessionId;
         // Fix: Use persistent ID from client options if available, otherwise fallback to session ID
@@ -383,7 +373,6 @@ export class GameRoom extends Room<GameState> {
         }
         this.assignedJoinOrders.add(assignedOrder);
         player.joinOrder = assignedOrder;
-        console.log(`[GameRoom] Assigned joinOrder ${assignedOrder} to ${player.name} (${client.sessionId})`);
 
         this.state.players.set(client.sessionId, player);
         
@@ -392,10 +381,8 @@ export class GameRoom extends Room<GameState> {
     }
 
     onLeave(client: Client, consented: boolean) {
-        console.log(client.sessionId, "left!");
         const player = this.state.players.get(client.sessionId);
         if (player) {
-            console.log(`[GameRoom] Releasing joinOrder ${player.joinOrder} for ${player.name}`);
             this.assignedJoinOrders.delete(player.joinOrder);
             this.lastPositions.delete(client.sessionId);
 
@@ -409,6 +396,5 @@ export class GameRoom extends Room<GameState> {
     }
 
     onDispose() {
-        console.log("room", this.roomId, "disposing...");
     }
 }

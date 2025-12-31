@@ -42,7 +42,6 @@ const transport = new WebSocketTransport({
     pingMaxRetries: 0,
 });
 (transport as any).wss?.on?.("wsClientError", (err: any, _socket: any, req: any) => {
-    console.warn("[WS] wsClientError", err?.message || err, req?.url);
 });
 (transport as any).server = httpServer;
 const gameServer = new Server({ transport });
@@ -107,7 +106,6 @@ gameServer.define("game_room", GameRoom)
 
 app.get("/api/leaderboard/:alias", async (req, res) => {
     const alias = req.params.alias;
-    console.log(`[API] Fetching leaderboard for ${alias}`);
     try {
         const identifier = typeof req.query.identifier === "string" ? String(req.query.identifier) : undefined;
         const data = await TaloService.getLeaderboardEntries(alias, identifier);
@@ -117,7 +115,6 @@ app.get("/api/leaderboard/:alias", async (req, res) => {
         }
         res.json(data);
     } catch (e) {
-        console.error(`[API] Error fetching leaderboard ${alias}:`, e);
         res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
 });

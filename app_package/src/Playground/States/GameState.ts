@@ -21,10 +21,8 @@ export class GameState extends State {
         Main.diorama?.setEnable(null);
 
         if (!GameState.gameSession?.inProgress()) {
-            console.log("[GameState] Starting new session with gameDefinition:", GameState.gameDefinition);
             GameState.gameSession?.start(GameState.gameDefinition);
         } else {
-            console.log("[GameState] Resuming session");
             GameState.gameSession?.resume();
             // Reset flag to allow pointer lock re-request after resume
             GameState._pointerLockRequested = false;
@@ -37,7 +35,6 @@ export class GameState extends State {
                 if (GameState._pointerLockRequested || document.pointerLockElement) return;
                 GameState._pointerLockRequested = true;
 
-                console.log("[GameState] Requesting pointer lock after user interaction");
                 try {
                     // Set requesting flag to prevent changeCallback from triggering menu
                     (InputManager as any)._isRequestingPointerLock = true;
@@ -52,13 +49,11 @@ export class GameState extends State {
                     const lockPromise = canvas.requestPointerLock();
                     if (lockPromise && typeof lockPromise.catch === 'function') {
                         lockPromise.catch((error: any) => {
-                            console.warn("[GameState] Pointer lock request rejected:", error);
                             (InputManager as any)._isRequestingPointerLock = false;
                             GameState._pointerLockRequested = false;
                         });
                     }
                 } catch (error) {
-                    console.warn("[GameState] Failed to request pointer lock:", error);
                     (InputManager as any)._isRequestingPointerLock = false;
                     GameState._pointerLockRequested = false;
                 }
