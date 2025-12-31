@@ -16,7 +16,7 @@ class HUDPanel {
     private _missile: Slider
     private _speed: Slider
     private _statsPanel : Rectangle
-    private _statsPanelImage : Image;
+    // private _statsPanelImage : Image;
     private _statsGrid : Grid;
     private _healthIcon : Image;
     private _speedIcon : Image;
@@ -79,58 +79,35 @@ class HUDPanel {
         this._statsPanel = new Rectangle("statsPanel");
         this._statsPanel.heightInPixels = 185;
         this._statsPanel.thickness = 0;
-        if (index) {
-            if(InputManager.isTouch) {
-                this._statsPanel.width = 1.0;
-                this._statsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-                this._statsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;        
-            } else {
-                this._statsPanel.widthInPixels = 425;
-                this._statsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-                this._statsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;        
-                this._statsPanel.left = "-90px";
-                this._statsPanel.top = "-90px";
-            }
-        } else {
-            if(InputManager.isTouch) {
-                this._statsPanel.width = 1.0;
-                this._statsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-                this._statsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;        
-            } else {
-                this._statsPanel.widthInPixels = 425;
-                this._statsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-                this._statsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;        
-                this._statsPanel.left = "90px";
-                this._statsPanel.top = "-90px";
-            }
-        }
+        this._statsPanel.width = 1.0;
+        this._statsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        this._statsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         adt.addControl(this._statsPanel)
 
         const fallbackUrl = window.location.href.includes('/docs/') 
             ? window.location.origin + '/docs/' 
             : window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
         const assetsHostUrl = Assets.globalAssetsHostUrl || fallbackUrl;
+        
+        // Removed statsPanelImage to align with Mobile/Blue design
+        /*
         this._statsPanelImage = new Image("statsPanelImage", Assets.joinUrl(assetsHostUrl, "/assets/UI/statsPanel.svg"));
-        this._statsPanelImage.widthInPixels = 300;
-        this._statsPanelImage.heightInPixels = 185;
+        this._statsPanelImage.widthInPixels = 220;
+        this._statsPanelImage.heightInPixels = 130;
         this._statsPanelImage.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         if (InputManager.isTouch === false) {
             this._statsPanel.addControl(this._statsPanelImage);
         }
+        */
 
         this._statsGrid = new Grid();
         this._statsGrid.addColumnDefinition(45, true);
         this._statsGrid.addColumnDefinition(1.0, false);
-        if (InputManager.isTouch) {
-            this._statsGrid.addRowDefinition(15, true);
-            this._statsGrid.addRowDefinition(15, true);
-            this._statsGrid.addRowDefinition(15, true);
-        } else {
-            this._statsGrid.addRowDefinition(40, true);
-            this._statsGrid.addRowDefinition(40, true);
-            this._statsGrid.addRowDefinition(40, true);
-            this._statsGrid.top = "38px";
-        }
+        // Unified grid layout to match Mobile design
+        this._statsGrid.addRowDefinition(35, true); // Icons are 35px
+        this._statsGrid.addRowDefinition(15, true); // Bars
+        this._statsGrid.addRowDefinition(15, true); // Missile Bar
+        
         this._statsGrid.widthInPixels = 200;
         this._statsGrid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         this._statsGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
@@ -155,7 +132,7 @@ class HUDPanel {
         this._health = new Slider("health");
         this._health.color = "#af2d0e";
         this._health.background = "#878787";
-        this._health.height = 1.0;
+        this._health.height = "15px";
         this._health.displayThumb = false;
         this._health.minimum = 0;
         this._health.maximum = 100;
@@ -325,7 +302,7 @@ export class HUD {
     private _teammateMap: Map<number, Rectangle> = new Map();
 
     constructor(shipManager : ShipManager, assets: Assets, scene: Scene, players: Array<Ship>) {
-        console.log(JSON.stringify(Object.getOwnPropertyNames(Parameters)));
+        // console.log(JSON.stringify(Object.getOwnPropertyNames(Parameters)));
         this._shipManager = shipManager;
         this._adt = AdvancedDynamicTexture.CreateFullscreenUI("HUD", true, scene);
         this._adt.layer!.layerMask = 0x10000000;
@@ -344,23 +321,32 @@ export class HUD {
             this._aiCounter.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
             this._aiCounter.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         } else {
-            this._aiCounter.heightInPixels = 185;
-            this._aiCounter.widthInPixels = 445;
-            this._aiCounter.left = "80px";
-            this._aiCounter.top = "-90px";    
-            this._aiCounter.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-            this._aiCounter.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+            // Fix: Align text with bars (Height 45px)
+            this._aiCounter.heightInPixels = 50; // Slightly more to be safe
+            this._aiCounter.widthInPixels = 500;
+            this._aiCounter.top = "0px";    
+            this._aiCounter.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+            this._aiCounter.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         }
         this._adt.addControl(this._aiCounter)
 
         this._aiCounterGrid = new Grid();
-        this._aiCounterGrid.addRowDefinition(0.55, false);
-        this._aiCounterGrid.addRowDefinition(0.45, false);
+        if (InputManager.isTouch) {
+            this._aiCounterGrid.addRowDefinition(0.55, false);
+            this._aiCounterGrid.addRowDefinition(0.45, false);
+        } else {
+             // PC: Fixed heights to align with stats grid (65px total)
+             // Stats Grid: 35 (Icon) + 15 (Bar) + 15 (Missile) = 65px.
+             // We want Label Bottom at 65px.
+             // Label is 15px. So Number should be 50px.
+             this._aiCounterGrid.addRowDefinition(50, true); // Number
+             this._aiCounterGrid.addRowDefinition(15, true); // Label
+        }
         this._aiCounterGrid.addColumnDefinition(0.5, false);
         this._aiCounterGrid.addColumnDefinition(300, true);
         this._aiCounterGrid.addColumnDefinition(0.5, false);
         this._aiCounterGrid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-        this._aiCounterGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+        this._aiCounterGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         this._aiCounterGrid.height = 1.0;
         this._aiCounterGrid.width = 1.0;
         this._aiCounter.addControl(this._aiCounterGrid);
@@ -371,8 +357,8 @@ export class HUD {
             this._alliesRemaining.height = 1.0;
             this._alliesRemaining.fontSize = "15px";
         } else {
-            this._alliesRemaining.heightInPixels = 40;
-            this._alliesRemaining.fontSize = "30px";
+            this._alliesRemaining.heightInPixels = 30;
+            this._alliesRemaining.fontSize = "20px";
         }
         this._alliesRemaining.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
         this._alliesRemaining.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
@@ -387,7 +373,7 @@ export class HUD {
             this._alliesRemainingLabel.height = 1.0;
             this._alliesRemainingLabel.fontSize = "10px";
         } else {
-            this._alliesRemainingLabel.heightInPixels = 40;
+            this._alliesRemainingLabel.heightInPixels = 15;
             this._alliesRemainingLabel.fontSize = "14px";
         }
         this._alliesRemainingLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
@@ -403,8 +389,8 @@ export class HUD {
             this._enemiesRemaining.height = 1.0;
             this._enemiesRemaining.fontSize = "15px";
         } else {
-            this._enemiesRemaining.heightInPixels = 40;
-            this._enemiesRemaining.fontSize = "30px";
+            this._enemiesRemaining.heightInPixels = 30;
+            this._enemiesRemaining.fontSize = "20px";
         }
         this._enemiesRemaining.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
         this._enemiesRemaining.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
@@ -419,7 +405,7 @@ export class HUD {
             this._enemiesRemainingLabel.height = 1.0;
             this._enemiesRemainingLabel.fontSize = "10px";
         } else {
-            this._enemiesRemainingLabel.heightInPixels = 40;
+            this._enemiesRemainingLabel.heightInPixels = 15;
             this._enemiesRemainingLabel.fontSize = "14px";
         }
         this._enemiesRemainingLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -529,16 +515,19 @@ export class HUD {
         actors.forEach(a => {
             if (me) {
                  const container = new Rectangle("teammateContainer");
-                 container.width = "200px";
+                 container.width = "280px";
                  container.height = "30px";
                  container.thickness = 0;
                  container.background = "transparent";
                  container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                 container.isHitTestVisible = false;
 
                  const t = new TextBlock("teammate", a.name || "Player");
                  t.color = "white";
                  t.fontSize = "20px";
+                 t.fontFamily = "Arial, Helvetica, sans-serif"; // Force standard font
                  t.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                 t.isHitTestVisible = false;
                  GuiFramework.setFont(t, true, true);
                  
                  container.addControl(t);
@@ -568,6 +557,19 @@ export class HUD {
         const localShip = players[0];
         const localFaction = localShip ? localShip.faction : 0;
 
+        // Use local ship state for enemy count to match arrows
+        // Server state can be used for total validation, but local simulation is smoother for HUD
+        // If we want strict sync, we would use:
+        /*
+        if (playService.colyseusRoom && playService.colyseusRoom.state) {
+            const total = playService.colyseusRoom.state.totalEnemies;
+            const killed = playService.colyseusRoom.state.enemiesKilled;
+            if (typeof total === "number" && typeof killed === "number") {
+                enemyCount = Math.max(0, total - killed);
+            }
+        }
+        */
+
         this._hudPanels.forEach((hudPanel, index) => {
             hudPanel.tick(engine, players[index], this._shipManager);
         });
@@ -585,53 +587,55 @@ export class HUD {
                     // Count allies (including self)
                     allyCount++;
                 }
+            }
 
-                // Update Player Labels
-                if (ship.isHuman && ship !== localShip) {
-                    let label = this._playerLabels.get(shipIndex);
-                    if (!label) {
-                        label = new TextBlock();
-                        label.fontSize = "14px";
-                        label.fontWeight = "bold";
-                        label.outlineColor = "black";
-                        label.outlineWidth = 2;
-                        label.isHitTestVisible = false;
-                        this._adt.addControl(label);
-                        this._playerLabels.set(shipIndex, label);
-                    }
+            // Update Player Labels (Separate from isValid check to show DEAD status)
+            if (ship.isHuman && ship !== localShip) {
+                let label = this._playerLabels.get(shipIndex);
+                if (!label) {
+                    label = new TextBlock();
+                    label.fontSize = "14px";
+                    label.fontWeight = "bold";
+                    label.fontFamily = "Arial, Helvetica, sans-serif"; // Force standard font
+                    label.outlineColor = "black";
+                    label.outlineWidth = 2;
+                    label.isHitTestVisible = false;
+                    this._adt.addControl(label);
+                    this._playerLabels.set(shipIndex, label);
+                }
 
-                    // Get player name
-                    let name = "PLAYER";
-                    if (shipIndex < actors.length) {
-                         const props = actors[shipIndex].properties;
-                         const displayName = props ? props.displayName : undefined;
-                         if (displayName) {
-                             name = String(displayName);
-                         } else {
-                             name = actors[shipIndex].name || "PLAYER";
-                         }
-                    }
-                    label.text = name;
-
-                    if (localShip && localShip.shipCamera) {
-                        this._computeScreenCoord(engine, localShip.shipCamera.getFreeCamera(), ship.root.position, label);
-                        label.color = (ship.faction === localFaction) ? "#4f73ff" : "#ff4f4f";
+                if (ship.isValid()) {
+                    label.text = playService.getRoom()?.actors.find(a => parseInt(String(a.properties?.joinOrder ?? "-1"), 10) === shipIndex)?.name || "Player " + (shipIndex + 1);
+                    label.color = (ship.faction === localFaction) ? "#4f73ff" : "#ff4f4f";
+                    
+                    const linkTarget: any = ship.shipMesh || ship.root;
+                    if (linkTarget && typeof linkTarget.isEnabled === "function" && linkTarget.isEnabled()) {
+                        label.isVisible = true;
+                        label.linkWithMesh(linkTarget);
+                        label.linkOffsetY = -50;
                     } else {
                         label.isVisible = false;
                     }
                 } else {
-                    const label = this._playerLabels.get(shipIndex);
-                    if (label) label.isVisible = false;
-                }
-
-                if (Parameters.AIDebugLabels) {
-                    const movement = `${ship.input.burst ? 'bursting' : ''}${ship.input.breaking ? 'breaking' : ''}`;
-                    ship.debugLabel!.text = `${ship.state}\nidx: ${shipIndex} tgt: ${ship.bestPrey}\n${movement}`;
-                    ship.debugLabel!.isVisible = Parameters.AIDebugLabels;
+                    // Show DEAD status
+                    label.text = (playService.getRoom()?.actors.find(a => parseInt(String(a.properties?.joinOrder ?? "-1"), 10) === shipIndex)?.name || "Player " + (shipIndex + 1)) + " (DEAD)";
+                    label.color = "#ff0000";
+                    label.isVisible = true;
+                    const linkTarget: any = ship.shipMesh || ship.root;
+                    if (linkTarget) {
+                        label.linkWithMesh(linkTarget);
+                        label.linkOffsetY = -50;
+                    }
                 }
             } else {
                 const label = this._playerLabels.get(shipIndex);
                 if (label) label.isVisible = false;
+            }
+
+            if (Parameters.AIDebugLabels && ship.debugLabel) {
+                const movement = `${ship.input.burst ? 'bursting' : ''}${ship.input.breaking ? 'breaking' : ''}`;
+                ship.debugLabel.text = `${ship.state}\nidx: ${shipIndex} tgt: ${ship.bestPrey}\n${movement}`;
+                ship.debugLabel.isVisible = Parameters.AIDebugLabels;
             }
         });
 

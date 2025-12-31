@@ -107,7 +107,7 @@ export class Matchmaking extends State {
       playersText.height = "30px"
       playersText.textWrapping = false
       playersText.topInPixels = 26
-      avatarGrid.addControl(playersText, 1, 1)
+      avatarGrid.addControl(playersText)
     }
     ;(this as any)._playersOnlineText = playersText
     const updatePlayers = () => {
@@ -119,7 +119,15 @@ export class Matchmaking extends State {
           const sameGame = !!(r.properties && r.properties["gameId"] === "SpacePirates")
           return sameApp || sameGame
         })
-        const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0)
+        const total = filtered.reduce((acc: number, r: any) => {
+            let count = (Array.isArray(r.actors) ? r.actors.length : 0);
+            if (count === 0 && r.properties && (r.properties.playing || r.properties.game_started || r.is_closed)) {
+                // Heuristic: If playing/full but actors list is empty, assume max players (default 4) or 1
+                // to ensure we don't show "0" for an active game.
+                count = (r.max_players || 4);
+            }
+            return acc + count;
+        }, 0)
         const t = (this as any)._playersOnlineText as TextBlock
         if (t) {
              t.text = ""
@@ -164,7 +172,7 @@ export class Matchmaking extends State {
       const res = await playService.createRoom({
         name,
         mode: "team",
-        maxPlayers: 2,
+        maxPlayers: 4,
         minPlayers: 2,
         properties: roomProperties
       })
@@ -199,7 +207,7 @@ export class Matchmaking extends State {
       const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
       const target = (this.listedRooms || []).find(r => r.id === rid)
       if (target && (
-          (Array.isArray(target.actors) && target.actors.length >= (target.max_players || 2)) ||
+          (Array.isArray(target.actors) && target.actors.length >= (target.max_players || 4)) ||
           (target.properties && (target.properties.playing || target.properties.game_started))
          )) {
         console.log("[UI] join blocked: room full or playing", { id: rid })
@@ -286,6 +294,9 @@ export class Matchmaking extends State {
       avatarGrid.removeControl((this as any)._playersOnlineText)
       ;(this as any)._playersOnlineText = undefined
     }
+    this.roomsPanel = undefined
+    this.roomIdInput = undefined
+    this.joinBtn = undefined
   }
 
   private async refreshRooms(roomsOverride?: any[]) {
@@ -306,7 +317,9 @@ export class Matchmaking extends State {
     filteredRooms = filteredRooms.filter((r: any) => {
       const actorList = (r.actors || [])
       const count = Array.isArray(actorList) ? actorList.length : 0
-      return count > 0 && !r.is_closed
+      // Show room if it has players, or if it's playing/started (even if actors list is empty in summary), or if closed/full
+      const isPlaying = r.properties && (r.properties.playing || r.properties.game_started)
+      return count > 0 || isPlaying || !!r.is_closed
     })
 
     this.listedRooms = filteredRooms
@@ -371,8 +384,8 @@ export class Matchmaking extends State {
       container.height = "60px"
       const actorList = (r.actors || [])
       console.log("[UI] Room row:", { id: r.id, actors: actorList.length, playing: r.properties?.playing, started: r.properties?.game_started })
-      // Enforce 2-player limit for UI status, regardless of server max_players (which might include AI slots)
-      const canJoinRow = !r.is_closed && actorList.length < 2 && !(r.properties && (r.properties.playing || r.properties.game_started))
+      // Enforce 4-player limit for UI status
+      const canJoinRow = !r.is_closed && actorList.length < (r.max_players || 4) && !(r.properties && (r.properties.playing || r.properties.game_started))
       row.addControl(container, 0, 0)
       const cb = new Checkbox()
       cb.isChecked = this.selectedRoomId === r.id
@@ -443,7 +456,7 @@ export class Matchmaking extends State {
       
       if (isPlaying) {
           statusText = "Playing";
-      } else if (actorList.length >= 2 || r.is_closed) {
+      } else if (actorList.length >= (r.max_players || 4) || r.is_closed) {
           statusText = "Full";
       }
 
@@ -462,7 +475,7 @@ export class Matchmaking extends State {
     const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
     const target = (this.listedRooms || []).find(r => r.id === rid)
     const canJoin = !!target && !target.is_closed && 
-                    ((target.actors || []).length < 2) && 
+                    ((target.actors || []).length < (target.max_players || 4)) && 
                     !(target.properties && (target.properties.playing || target.properties.game_started))
     if (this.joinBtn) this.joinBtn.isEnabled = canJoin
   }

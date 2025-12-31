@@ -6,9 +6,11 @@ import { BattleSelect } from "./BattleSelect";
 import { Diorama } from "./Diorama";
 import { State } from "./State";
 import { States } from "./States";
+import { Leaderboard } from "./Leaderboard";
 import { Assets } from "../Assets";
 import { GuiFramework } from "../GuiFramework";
 import { playService, authService, avatarService } from "../../Viverse/Viverse";
+import { TaloClient } from "../../Integrations/Talo";
 
 export class Main extends State {
 
@@ -16,8 +18,11 @@ export class Main extends State {
     public static playButton: Nullable<Button> = null;
     private _playersOnlineText?: TextBlock;
     private _playersTimer?: number;
+    private _panel: Nullable<StackPanel> = null;
+
     public exit() {
         super.exit();
+        this._panel = null;
         if (this._playersTimer) { window.clearInterval(this._playersTimer); this._playersTimer = undefined as any; }
         if (this._adt && this._playersOnlineText) {
             const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
@@ -47,6 +52,7 @@ export class Main extends State {
             grid.paddingLeft = "100px";
             GuiFramework.formatButtonGrid(grid);
             grid.addControl(panel, 0, 0);
+            this._panel = panel;
 
             const fallbackUrl = window.location.href.includes('/docs/')
                 ? window.location.origin + '/docs/'
@@ -59,61 +65,8 @@ export class Main extends State {
             logo.top = "100px";
             grid.addControl(logo, 0, 1);
 
-            Main.playButton = GuiFramework.addButton("Single Play", panel);
-            Main.playButton.isVisible = Assets.loadingComplete;
+            this.renderMainMenu();
 
-            Main.playButton.onPointerDownObservable.add(function (info) {
-                const gameDefinition = new GameDefinition();
-                // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
-                gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
-                gameDefinition.aiEnemies = Parameters.enemyCount;
-                gameDefinition.aiAllies = Parameters.allyCount;
-                console.log("[Main] Play clicked. allowSplitScreen=", Parameters.allowSplitScreen, "humanAllies=", gameDefinition.humanAllies, "aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
-                BattleSelect.gameDefinition = gameDefinition;
-                State.setCurrent(States.battleSelect);
-            });
-
-            if (Parameters.allowSplitScreen) {
-                GuiFramework.addButton("Two Player Co-op", panel).onPointerDownObservable.add(function (info) {
-                    const gameDefinition = new GameDefinition();
-                    gameDefinition.humanAllies = 2;
-                    gameDefinition.aiEnemies = Parameters.enemyCount;
-                    gameDefinition.aiAllies = Parameters.allyCount;
-                    console.log("[Main] 2P Co-op selected. humanAllies=2 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
-                    BattleSelect.gameDefinition = gameDefinition;
-                    State.setCurrent(States.battleSelect);
-                });
-
-                GuiFramework.addButton("Two Players Vs", panel).onPointerDownObservable.add(function (info) {
-                    const gameDefinition = new GameDefinition();
-                    gameDefinition.humanAllies = 1;
-                    gameDefinition.humanEnemies = 1;
-                    gameDefinition.aiEnemies = Parameters.enemyCount;
-                    gameDefinition.aiAllies = Parameters.allyCount;
-                    console.log("[Main] 2P Vs selected. humanAllies=1 humanEnemies=1 aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
-                    BattleSelect.gameDefinition = gameDefinition;
-                    State.setCurrent(States.battleSelect);
-                });
-            }
-
-            GuiFramework.addButton("CO-OP", panel).onPointerDownObservable.add(function (info) {
-                States.matchmaking.pvpMode = false;
-                State.setCurrent(States.matchmaking);
-            });
-
-            // GuiFramework.addButton("Online PvP", panel).onPointerDownObservable.add(function (info) {
-            //     States.matchmaking.pvpMode = true;
-            //     State.setCurrent(States.matchmaking);
-            // });
-
-            GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
-                States.options.backDestination = States.main;
-                State.setCurrent(States.options);
-            });
-
-            GuiFramework.addButton("Credits", panel).onPointerDownObservable.add(function (info) {
-                State.setCurrent(States.credits);
-            });
             this._adt.addControl(grid);
             const existingAvatar = this._adt.getControlByName("globalAvatarGrid");
             if (existingAvatar) {
@@ -133,6 +86,14 @@ export class Main extends State {
                     try {
                         const profile = await avatarService.getProfile();
                         GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl);
+                        
+                        // Set Actor for Talo/PlayService
+                        const accountId = await authService.getAccountId();
+                        playService.setActor({
+                            session_id: accountId || (info as any).account_id || "User",
+                            name: profile.name || "Player",
+                            properties: { headIconUrl: profile.activeAvatar?.headIconUrl || "" }
+                        });
                     } catch (e) {
                         console.warn("[Main] Failed to get profile", e);
                         GuiFramework.updateTopLeftAvatar("Player");
@@ -146,9 +107,30 @@ export class Main extends State {
                     } else {
                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
+                    
+                    // Set Guest Actor
+                    if (!playService.getActor()) {
+                        const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                        playService.setActor({
+                            session_id: guestId,
+                            name: guestId,
+                            properties: {}
+                        });
+                    }
                 }
             }).catch((e) => {
                 console.warn("[Main] checkAuth failed", e);
+                // Set Guest Actor on failure too
+                if (!playService.getActor()) {
+                    const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                    playService.setActor({
+                        session_id: guestId,
+                        name: guestId,
+                        properties: {}
+                    });
+                    TaloClient.identify(guestId);
+                }
+
                 const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                 if (!isViverseDomain) {
                     console.log("[Main] User checkAuth failed, showing login button");
@@ -161,6 +143,7 @@ export class Main extends State {
             if (!playersText) {
                 playersText = new TextBlock("globalPlayersOnline", "Players Online: --");
                 GuiFramework.setFont(playersText, true, true);
+                playersText.fontFamily = "Arial, Helvetica, sans-serif"; // Force standard font to avoid rendering artifacts
                 playersText.color = "#a6fffa";
                 playersText.fontSize = 24;
                 playersText.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -172,7 +155,8 @@ export class Main extends State {
                 playersText.height = "30px";
                 playersText.textWrapping = false;
                 playersText.topInPixels = 26;
-                avatarGrid.addControl(playersText, 1, 1);
+                // avatarGrid is now a StackPanel
+                avatarGrid.addControl(playersText);
             }
             this._playersOnlineText = playersText;
             const updatePlayers = () => {
@@ -198,6 +182,7 @@ export class Main extends State {
             this._playersTimer = window.setInterval(updatePlayers, 2000);
         } else {
             var panel = new StackPanel();
+            this._panel = panel;
             panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
             panel.paddingBottom = "100px";
 
@@ -224,6 +209,26 @@ export class Main extends State {
                 console.log("[Main] Play clicked (portrait). allowSplitScreen=", Parameters.allowSplitScreen, "humanAllies=", gameDefinition.humanAllies, "aiEnemies=", gameDefinition.aiEnemies, "aiAllies=", gameDefinition.aiAllies);
                 BattleSelect.gameDefinition = gameDefinition;
                 State.setCurrent(States.battleSelect);
+            });
+
+            GuiFramework.addButton("Leaderboard (Single)", panel).onPointerDownObservable.add(function (info) {
+                Leaderboard.leaderboardConfig = {
+                    killsAlias: "TotalKillsSingle",
+                    winsAlias: "TotalWinsSingle",
+                    title: "Leaderboard (Single)"
+                };
+                States.leaderboard.backDestination = States.main;
+                State.setCurrent(States.leaderboard);
+            });
+
+            GuiFramework.addButton("Leaderboard (CO-OP)", panel).onPointerDownObservable.add(function (info) {
+                Leaderboard.leaderboardConfig = {
+                    killsAlias: "TotalKillsCoop",
+                    winsAlias: "TotalWinsCoop",
+                    title: "Leaderboard (CO-OP)"
+                };
+                States.leaderboard.backDestination = States.main;
+                State.setCurrent(States.leaderboard);
             });
 
             if (Parameters.allowSplitScreen) {
@@ -259,6 +264,8 @@ export class Main extends State {
             //     State.setCurrent(States.matchmaking);
             // });
 
+
+
             GuiFramework.addButton("Options", panel).onPointerDownObservable.add(function (info) {
                 States.options.backDestination = States.main;
                 State.setCurrent(States.options);
@@ -286,6 +293,14 @@ export class Main extends State {
                     try {
                         const profile = await avatarService.getProfile();
                         GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl);
+                        
+                        // Set Actor for Talo/PlayService
+                        const accountId = await authService.getAccountId();
+                        playService.setActor({
+                            session_id: accountId || (info as any).accountName || "User",
+                            name: profile.name || "Player",
+                            properties: { headIconUrl: profile.activeAvatar?.headIconUrl || "" }
+                        });
                     } catch (e) {
                         console.warn("[Main] Failed to get profile", e);
                         GuiFramework.updateTopLeftAvatar("Player");
@@ -299,9 +314,28 @@ export class Main extends State {
                     } else {
                         console.log("[Main] User not logged in but on Viverse domain, skipping login button");
                     }
+
+                    // Set Guest Actor
+                    if (!playService.getActor()) {
+                        const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                        playService.setActor({
+                            session_id: guestId,
+                            name: guestId,
+                            properties: {}
+                        });
+                    }
                 }
             }).catch((e) => {
                 console.warn("[Main] checkAuth failed", e);
+                // Set Guest Actor
+                if (!playService.getActor()) {
+                    const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                    playService.setActor({
+                        session_id: guestId,
+                        name: guestId,
+                        properties: {}
+                    });
+                }
                 const isViverseDomain = window.location.hostname.includes("viverse.com") || window.location.hostname.includes("htcvive.com");
                 if (!isViverseDomain) {
                     console.log("[Main] User checkAuth failed, showing login button");
@@ -371,5 +405,76 @@ export class Main extends State {
         });
         this._adt.addControl(muteBtn);
 
+    }
+
+    private renderMainMenu() {
+        if (!this._panel) return;
+        this._panel.clearControls();
+
+        // Single Play
+        Main.playButton = GuiFramework.addButton("Single Play", this._panel);
+        Main.playButton.isVisible = Assets.loadingComplete;
+        Main.playButton.onPointerDownObservable.add(() => {
+             const gameDefinition = new GameDefinition();
+             gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
+             gameDefinition.aiEnemies = Parameters.enemyCount;
+             gameDefinition.aiAllies = Parameters.allyCount;
+             BattleSelect.gameDefinition = gameDefinition;
+             State.setCurrent(States.battleSelect);
+        });
+
+        // CO-OP
+        GuiFramework.addButton("CO-OP", this._panel).onPointerDownObservable.add(() => {
+            States.matchmaking.pvpMode = false;
+            State.setCurrent(States.matchmaking);
+        });
+
+        // Leaderboards (Submenu)
+        GuiFramework.addButton("Leaderboards", this._panel).onPointerDownObservable.add(() => {
+            this.renderLeaderboardMenu();
+        });
+
+        // Options
+        GuiFramework.addButton("Options", this._panel).onPointerDownObservable.add(() => {
+            States.options.backDestination = States.main;
+            State.setCurrent(States.options);
+        });
+
+        // Credits
+        GuiFramework.addButton("Credits", this._panel).onPointerDownObservable.add(() => {
+            State.setCurrent(States.credits);
+        });
+    }
+
+    private renderLeaderboardMenu() {
+        if (!this._panel) return;
+        this._panel.clearControls();
+
+        // Leaderboard - Single Play
+        GuiFramework.addButton("Single Play", this._panel).onPointerDownObservable.add(() => {
+             Leaderboard.leaderboardConfig = {
+                 killsAlias: "TotalKillsSingle",
+                 winsAlias: "TotalWinsSingle",
+                 title: "Leaderboard (Single)"
+             };
+             States.leaderboard.backDestination = States.main;
+             State.setCurrent(States.leaderboard);
+        });
+
+        // Leaderboard - CO-OP
+        GuiFramework.addButton("CO-OP", this._panel).onPointerDownObservable.add(() => {
+             Leaderboard.leaderboardConfig = {
+                 killsAlias: "TotalKillsCoop",
+                 winsAlias: "TotalWinsCoop",
+                 title: "Leaderboard (CO-OP)"
+             };
+             States.leaderboard.backDestination = States.main;
+             State.setCurrent(States.leaderboard);
+        });
+
+        // Back
+        GuiFramework.addButton("Back", this._panel).onPointerDownObservable.add(() => {
+            this.renderMainMenu();
+        });
     }
 }

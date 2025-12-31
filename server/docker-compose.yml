@@ -12,7 +12,7 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      - SPACEPIRATES_DOMAIN=spacepirates.app
+      - SPACEPIRATES_DOMAIN=spacepirates.duckdns.org
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ../docs:/srv/spacepirates:ro

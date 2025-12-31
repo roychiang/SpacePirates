@@ -182,8 +182,11 @@ export class InputManager {
             document.removeEventListener(`${pointerEventType}up`, InputManager.mouseMove, false);
 
             // Only transition to in-game menu if we're not in the middle of requesting pointer lock
+            // and if we are not in a game-ending state (Dead or Victory)
             if (!InputManager._isRequestingPointerLock) {
-                State.setCurrent(States.inGameMenu);
+                if (State.currentState !== States.dead && State.currentState !== States.victory) {
+                    State.setCurrent(States.inGameMenu);
+                }
             }
         }
     };

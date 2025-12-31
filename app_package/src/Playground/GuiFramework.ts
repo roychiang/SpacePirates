@@ -99,95 +99,208 @@ export class GuiFramework {
 
     public static ensureGlobalTopLeftAvatar(adt: AdvancedDynamicTexture) {
         const targetAdt = this.globalOverlayAdt || adt
-        const existing = targetAdt.getControlByName("globalAvatarGrid")
+        const existing = targetAdt.getControlByName("globalPlayerListPanel")
         if (!existing) {
             this.createTopLeftAvatar(targetAdt)
         }
-        return targetAdt.getControlByName("globalAvatarGrid") as Grid
+        return targetAdt.getControlByName("globalPlayerListPanel") as StackPanel
     }
 
     public static createTopLeftAvatar(adt: AdvancedDynamicTexture) {
-        const grid = new Grid("globalAvatarGrid")
-        grid.addRowDefinition(80, true)
-        grid.addRowDefinition(1.0, false)
-        grid.addColumnDefinition(200, true)
-        grid.addColumnDefinition(1.0, false)
-        grid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
-        grid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
-        grid.topInPixels = 10
-        grid.leftInPixels = 80
-        const avatarWrapper = new Rectangle("globalAvatarWrapper")
-        avatarWrapper.width = "64px"
-        avatarWrapper.height = "64px"
-        avatarWrapper.thickness = 0
-        avatarWrapper.cornerRadius = 32
-        avatarWrapper.clipChildren = true
-        avatarWrapper.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
-        const guestBg = new Rectangle("globalAvatarBg")
-        guestBg.width = "64px"
-        guestBg.height = "64px"
-        guestBg.thickness = 0
-        guestBg.background = "#1b2b33"
-        guestBg.cornerRadius = 32
-        const avatarImage = new Image("globalAvatarImage", "")
-        avatarImage.width = "64px"
-        avatarImage.height = "64px"
-        const guestQuestion = new TextBlock("globalAvatarQ")
-        this.setFont(guestQuestion, true, true)
-        guestQuestion.color = "#4f73ff"
-        guestQuestion.fontSize = 36
-        guestQuestion.text = "?"
-        guestQuestion.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER
-        guestQuestion.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER
-        avatarWrapper.addControl(guestBg)
-        avatarWrapper.addControl(guestQuestion)
-        avatarWrapper.addControl(avatarImage)
-        const avatarRing = new Ellipse("globalAvatarRing")
-        avatarRing.width = "64px"
-        avatarRing.height = "64px"
-        avatarRing.color = "#a6fffa"
-        avatarRing.thickness = 2
-        avatarRing.background = "#688899"
-        const avatarCell = new StackPanel("globalAvatarCell")
-        avatarCell.width = "64px"
-        avatarCell.height = "64px"
-        avatarCell.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP
-        avatarCell.addControl(avatarWrapper)
-        avatarCell.addControl(avatarRing)
-        grid.addControl(avatarCell, 0, 0)
-        const name = new TextBlock("globalAvatarName")
-        this.setFont(name, true, true)
-        name.color = "white"
-        name.fontSize = 24
-        name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT
-        grid.addControl(name, 0, 1)
-        adt.addControl(grid)
-        if (this.cachedName || this.cachedUrl) {
-            this.updateTopLeftAvatar(this.cachedName || "", this.cachedUrl || "")
-        }
-        return grid
+        // Main Container (StackPanel)
+        const panel = new StackPanel("globalPlayerListPanel");
+        panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        panel.topInPixels = 10;
+        panel.leftInPixels = 80;
+        panel.width = "400px"; // Give it enough width
+        panel.isVertical = true;
+        
+        // We will populate this panel dynamically in updateTopLeftAvatar
+        // But for compatibility with existing code that expects a "globalAvatarGrid",
+        // we can create an initial placeholder or just handle the update logic.
+        
+        // Existing code expects "globalAvatarGrid" to exist for Login Button attachment?
+        // Let's create a dummy or refactor attachLoginButton.
+        // Actually, attachLoginButton uses "globalAvatarGrid". 
+        // We should create a default "Local Player" entry here to match legacy behavior.
+        
+        const localEntry = this.createPlayerEntry("globalAvatar", "Player", "", true);
+        panel.addControl(localEntry);
+
+        adt.addControl(panel);
+        
+        // Ensure we display something even if cachedName is missing
+        this.updateTopLeftAvatar(this.cachedName || "Player", this.cachedUrl || "", adt);
+        
+        return panel;
     }
 
-    public static updateTopLeftAvatar(name?: string, url?: string) {
-        this.cachedName = name
-        this.cachedUrl = url
-        const adt = this.globalOverlayAdt || this.currentAdt
-        if (!adt) return
-        const nameCtrl = adt.getControlByName("globalAvatarName") as TextBlock
-        const img = adt.getControlByName("globalAvatarImage") as Image
-        const bg = adt.getControlByName("globalAvatarBg") as Rectangle
-        const q = adt.getControlByName("globalAvatarQ") as TextBlock
-        if (nameCtrl && name) nameCtrl.text = name
-        if (img && url && url.length > 0) {
-            img.source = url
-            img.alpha = 1
-            if (bg) bg.alpha = 0
-            if (q) q.alpha = 0
-        } else {
-            if (img) img.alpha = 0
-            if (bg) bg.alpha = 1
-            if (q) q.alpha = 1
+    public static createPlayerEntry(prefix: string, name: string, url: string, isLocal: boolean = false): Grid {
+        const grid = new Grid(prefix + "Grid");
+        grid.height = "70px";
+        grid.width = "100%";
+        grid.addColumnDefinition(80, true);
+        grid.addColumnDefinition(1.0, false);
+        
+        const avatarWrapper = new Rectangle(prefix + "Wrapper");
+        avatarWrapper.width = "64px";
+        avatarWrapper.height = "64px";
+        avatarWrapper.thickness = 0;
+        avatarWrapper.cornerRadius = 32;
+        avatarWrapper.clipChildren = true;
+        avatarWrapper.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        avatarWrapper.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT; // Fix alignment
+        
+        const guestBg = new Rectangle(prefix + "Bg");
+        guestBg.width = "64px";
+        guestBg.height = "64px";
+        guestBg.thickness = 0;
+        guestBg.background = "#1b2b33";
+        guestBg.cornerRadius = 32;
+        
+        const avatarImage = new Image(prefix + "Image", url || "");
+        avatarImage.width = "64px";
+        avatarImage.height = "64px";
+        avatarImage.alpha = (url && url.length > 0) ? 1 : 0;
+        guestBg.alpha = (url && url.length > 0) ? 0 : 1;
+
+        const guestQuestion = new TextBlock(prefix + "Q");
+        this.setFont(guestQuestion, true, true);
+        guestQuestion.color = "#4f73ff";
+        guestQuestion.fontSize = 36;
+        guestQuestion.text = "?";
+        guestQuestion.alpha = (url && url.length > 0) ? 0 : 1;
+        
+        avatarWrapper.addControl(guestBg);
+        avatarWrapper.addControl(guestQuestion);
+        avatarWrapper.addControl(avatarImage);
+        
+        const avatarRing = new Ellipse(prefix + "Ring");
+        avatarRing.width = "64px";
+        avatarRing.height = "64px";
+        avatarRing.color = "#a6fffa";
+        avatarRing.thickness = 2;
+        avatarRing.background = "#688899"; // Wait, background fills the ring?
+        // Original code had background #688899. 
+        // But the Wrapper is inside a "Cell" StackPanel in original code.
+        
+        // Replicating structure:
+        const avatarCell = new StackPanel(prefix + "Cell");
+        avatarCell.width = "64px";
+        avatarCell.height = "64px";
+        avatarCell.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        avatarCell.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        avatarCell.addControl(avatarWrapper);
+        avatarCell.addControl(avatarRing); // Ring over wrapper? Or under? 
+        // Original: grid.addControl(avatarCell, 0, 0). 
+        // And avatarCell added Wrapper then Ring. So Ring is on top (if same Z).
+        // But Ring has background? If Ring has background it covers wrapper.
+        // Let's assume original Ring background was transparent or behind.
+        avatarRing.alpha = 0; // Hide ring by default if it blocks? 
+        // Actually original code: avatarRing.background = "#688899".
+        // If it's on top, it blocks. 
+        // Let's check original code order:
+        // avatarCell.addControl(avatarWrapper)
+        // avatarCell.addControl(avatarRing)
+        // StackPanel stacks VERTICALLY by default.
+        // So Ring is BELOW Wrapper in Y-axis?
+        // Original avatarCell was StackPanel (vertical).
+        // Wrapper (64px) + Ring (64px) = 128px height?
+        // But row definition was 80px.
+        // This implies they were stacked vertically.
+        // This seems wrong for a "Ring around avatar".
+        // Usually you use a Grid to overlay.
+        // Let's use a Grid for the Cell to overlay them.
+        
+        const cellGrid = new Grid();
+        cellGrid.width = "64px";
+        cellGrid.height = "64px";
+        cellGrid.addControl(avatarRing); // Background
+        cellGrid.addControl(avatarWrapper); // Foreground content
+        
+        grid.addControl(cellGrid, 0, 0);
+
+        const nameCtrl = new TextBlock(prefix + "Name", name);
+        this.setFont(nameCtrl, true, true);
+        nameCtrl.color = "white";
+        nameCtrl.fontSize = 24;
+        nameCtrl.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        nameCtrl.paddingLeft = "10px";
+        
+        grid.addControl(nameCtrl, 0, 1);
+        
+        return grid;
+    }
+
+    public static updateTopLeftAvatar(data: string | {name: string, url?: string}[], url?: string, targetAdt?: AdvancedDynamicTexture) {
+        let adt = targetAdt || this.globalOverlayAdt || this.currentAdt;
+        if (!adt) {
+             // Fallback: Check if we can find any ADT from the scene or create a temporary one?
+             // Better to just log warning, or if we are in Main/Game, maybe we can find one.
+             // But let's try to ensure global overlay exists if we have a scene reference?
+             // We don't have scene reference here.
+             // But we can check if Main.adt exists? No Main is a state.
+             
+             // If we really need to update, maybe we should return.
+             // But the user request implies we should "add a fallback ADT creation".
+             // We need a scene to create ADT.
+             return;
         }
+        
+        const panel = adt.getControlByName("globalPlayerListPanel") as StackPanel;
+        if (!panel) return;
+
+        // Determine list of players
+        let players: {name: string, url?: string}[] = [];
+        if (Array.isArray(data)) {
+            players = data;
+        } else {
+            // Legacy single player update
+            this.cachedName = data;
+            this.cachedUrl = url;
+            players.push({ name: data, url: url });
+        }
+        
+        // If no players, at least show "Player"
+        if (players.length === 0) {
+             players.push({ name: "Player", url: "" });
+        }
+
+        // Clear existing children except potentially "Players Online" text if it was added manually?
+        // Main.ts adds "playersOnlineText" to the container.
+        // We should preserve controls that are NOT player entries.
+        // Player entries start with "pEntry_".
+        // Or we just rebuild everything.
+        // Main.ts adds control to "globalAvatarGrid".
+        // We need to support Main.ts finding "globalAvatarGrid".
+        // We renamed main container to "globalPlayerListPanel".
+        // Let's alias the first entry as "globalAvatarGrid" if it's the local player?
+        // Or better: Let Main.ts find "globalPlayerListPanel".
+        
+        // Rebuild
+        // We need to keep the "Players Online" text if it exists.
+        const extras: Control[] = [];
+        panel.children.forEach(c => {
+             if (c.name === "globalPlayersOnline") {
+                 extras.push(c);
+             }
+        });
+        
+        panel.clearControls();
+        
+        players.forEach((p, index) => {
+            // Use specific ID for first player to match legacy "globalAvatarName" lookups if needed
+            // But better to just create fresh.
+            // Main.ts might look for "globalAvatarName".
+            // Let's support legacy lookup for the FIRST player.
+            const prefix = index === 0 ? "globalAvatar" : `pEntry_${index}`;
+            const entry = this.createPlayerEntry(prefix, p.name, p.url || "");
+            panel.addControl(entry);
+        });
+        
+        // Re-add extras
+        extras.forEach(e => panel.addControl(e));
     }
 
     public static attachLoginButton(callback: () => void) {

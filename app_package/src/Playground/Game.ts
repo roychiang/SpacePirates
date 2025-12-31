@@ -8,6 +8,7 @@ import { Assets } from "./Assets";
 import { HUD } from './HUD';
 import { States } from "./States/States";
 import { State } from "./States/State";
+import { GuiFramework } from "./GuiFramework";
 import { Parameters } from './Parameters';
 import { Recorder } from "./Recorder/Recorder";
 import { ExplosionManager } from "./FX/Explosion";
@@ -16,6 +17,8 @@ import { GamepadInput } from "./Inputs/GamepadInput";
 import { TrailManager } from "./FX/Trail";
 import { World } from "./World";
 import { playService } from "../Viverse/Viverse";
+import { Leaderboard } from "./States/Leaderboard";
+import { TaloClient } from "../Integrations/Talo";
 
 export class GameDefinition {
     public humanAllies: number = 0;
@@ -57,13 +60,23 @@ export class Game {
     public activeCameras: Array<Camera> = new Array<Camera>();
     private _delayedEnd: number;
     private _gameDefinition: GameDefinition;
-    //private _glowLayer: GlowLayer;
+    // private _glowLayer: GlowLayer;
+    
+    // onEnemyKilled callback placeholder if needed
+    // public onEnemyKilled: (ship: Ship) => void = () => {};
 
     private _localPlayerIndex: number = 0;
+    private _gameResultReported: boolean = false;
+    private _activePlayerIndices: Set<number> = new Set<number>();
+    private _reportedPlayerDeaths: Set<number> = new Set<number>();
+    private _missileDown: boolean = false;
 
     constructor(assets: Assets, scene: Scene, canvas: HTMLCanvasElement, gameDefinition: Nullable<GameDefinition>, glowLayer: GlowLayer, localPlayerIndex: number = 0) {
         this._scene = scene;
         this._localPlayerIndex = localPlayerIndex;
+
+        // Ensure context binding
+        this.updatePlayerList = this.updatePlayerList.bind(this);
 
         var shootFrame = 0;
 
@@ -89,6 +102,25 @@ export class Game {
         this._trailManager = new TrailManager(scene, assets.trailMaterial ? assets.trailMaterial : new NodeMaterial("empty", scene), MaxShips + MAX_MISSILES);
         this._missileManager = new MissileManager(scene, this._trailManager);
         this._shipManager = new ShipManager(this._missileManager, this._shotManager, assets, this._trailManager, scene, MaxShips, gameDefinition, glowLayer);
+        
+        this._shipManager.onEnemyKilled = (killerShip, victimIndex) => {
+             // Notify server of the kill regardless of host status.
+             // The server will handle deduplication (killedEnemies Set).
+             const victim = this._shipManager.ships[victimIndex];
+             if (!victim || victim.isHuman || victim.faction !== 1) return;
+             const killerIndex = this._shipManager.ships.indexOf(killerShip);
+             if (killerIndex < 0) return;
+             playService.notifyEnemyKill({ enemyIndex: victimIndex, killerIndex });
+        };
+
+        this._shipManager.onShipDestroyed = (shipIndex) => {
+             // Notify server if the destroyed ship is the local player's ship
+             if (shipIndex === this._localPlayerIndex) {
+                 console.log("[Game] Local player died, notifying server.");
+                 playService.notifyPlayerDeath(this._localPlayerIndex);
+             }
+        };
+
         this._inputManager = new InputManager(scene, canvas);
         this._explosions = new ExplosionManager(scene, assets, glowLayer);
         this._sparksEffects = new SparksEffects(scene, assets);
@@ -99,6 +131,7 @@ export class Game {
 
         this.activeCameras = [];
         for (let i = 0; i < gameDefinition.humanAllies; i++) {
+            this._activePlayerIndices.add(i);
             const ship = this._shipManager.spawnShip(new Vector3(i * 50, 0, -500), Quaternion.Identity(), true, 0);
             if (ship) {
                 const camera = new ShipCamera(ship, scene);
@@ -128,6 +161,7 @@ export class Game {
 
                 // Calculate which player this enemy ship belongs to
                 const enemyPlayerIndex = gameDefinition.humanAllies + i;
+                this._activePlayerIndices.add(enemyPlayerIndex);
 
                 // Assign control index: local player's ship uses index 0 (keyboard/mouse)
                 // Remote players' ships use their broadcast index
@@ -226,17 +260,50 @@ export class Game {
 
         // Listen for player leave events (for all clients including host)
         playService.on("actorLeft", (p: any) => {
+            this.updatePlayerList();
             if (!p) return;
             const joinOrder = parseInt(p.properties?.joinOrder || "-1");
             console.log("[Game] Player left, index:", joinOrder);
             
             if (joinOrder >= 0 && joinOrder < this.humanPlayerShips.length) {
+                // Remove from active players to trigger Host migration if needed
+                this._activePlayerIndices.delete(joinOrder);
+
                 const ship = this.humanPlayerShips[joinOrder];
                 if (ship) {
                     console.log("[Game] Removing ship for left player:", joinOrder);
-                    ship.life = -1; // Mark as dead/invalid
-                    ship.dispose(); // Remove visuals
-                    // We don't remove from array to keep indices stable
+                    ship.life = -1;
+                    ship.shipMesh?.setEnabled(false);
+                    ship.trail?.invalidate();
+                    ship.shipCamera?.dispose();
+                }
+            }
+        });
+        
+        // Listen for new players (if late join is supported)
+        playService.on("actorJoined", (p: any) => {
+            this.updatePlayerList();
+        });
+        
+        // Initial update
+        this.updatePlayerList();
+
+        // Listen for player death events (broadcast by server)
+        playService.on("playerDied", (p: any) => {
+            if (!p) return;
+            const index = p.index;
+            console.log("[Game] Player died event received for index:", index);
+            
+            if (typeof index === "number" && index >= 0 && index < this.humanPlayerShips.length) {
+                // Ensure we don't destroy ourselves based on remote message if we are still alive locally?
+                // Actually, trust the server message. If server says died, they died.
+                const ship = this.humanPlayerShips[index];
+                if (ship && ship.isValid()) {
+                    console.log("[Game] Destroying ship for died player:", index);
+                    // Use shipManager to destroy properly
+                    this._shipManager.destroyShip(index);
+                    // Ensure life is set to -1 immediately so HUD updates
+                    ship.life = -1;
                 }
             }
         });
@@ -252,6 +319,9 @@ export class Game {
 
             // Client listens for game end
             playService.on("gameEnd", (p: any) => {
+                if (this._gameResultReported) return;
+                this._gameResultReported = true;
+
                 // Update statistics if provided
                 if (p && p.stats && Array.isArray(p.stats)) {
                     p.stats.forEach((s: any, index: number) => {
@@ -270,6 +340,15 @@ export class Game {
                     isVictory = (myFaction === p.winnerFaction);
                 } else if (p && p.result === "victory") {
                     isVictory = true;
+                }
+
+                // Report stats to Talo (Client Side)
+                const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                if (myShip) {
+                    const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                    if (!playService.colyseusRoom) {
+                        playService.reportGameResult(kills, isVictory);
+                    }
                 }
 
                 if (isVictory) {
@@ -294,11 +373,38 @@ export class Game {
                             pos = null;
                             rot = null;
                         }
+                        
+                        // Synchronization Fix: Dead is Dead.
+                        // If we locally know a ship is dead (life <= 0), do not accept "alive" updates (life > 0) from server.
+                        // This prevents stale or out-of-order packets from reviving dead players (Zombie Bug).
+                        const currentShip = this._shipManager.ships[s.index];
+                        if (currentShip && currentShip.life <= 0 && s.life > 0) {
+                             // Ignore this update for life, but maybe accept pos/rot? 
+                             // Usually dead ships don't move, so safe to ignore life update.
+                             return;
+                        }
+
                         this._shipManager.setShipState(s.index, s.life, pos, rot);
                     });
                 }
             });
         }
+
+        // Listen for playerDied events (Important for Host to know when clients die)
+        playService.on("playerDied", (p: any) => {
+            if (!p) return;
+            const index = p.index;
+            if (typeof index === "number" && index >= 0 && index < this.humanPlayerShips.length) {
+                // If it's me, I already handled it. If it's remote, I need to update.
+                if (index !== this._localPlayerIndex) {
+                    console.log(`[Game] Received playerDied for index ${index}`);
+                    const ship = this.humanPlayerShips[index];
+                    if (ship) {
+                        ship.life = -1;
+                    }
+                }
+            }
+        });
 
         // remove asteroids too close to ships
         this._world.removeAsteroids(new Vector3(0, 0, -500), 50);
@@ -336,23 +442,82 @@ export class Game {
                 logicalInput.shooting = local.shooting;
                 logicalInput.burst = local.burst;
                 logicalInput.breaking = local.breaking;
-                logicalInput.launchMissile = local.launchMissile;
+                const missilePressed = !!local.launchMissile && !this._missileDown;
+                this._missileDown = !!local.launchMissile;
                 logicalInput.immelmann = local.immelmann;
 
                 if (local.dx !== 0 || local.dy !== 0 || local.shooting) {
                     // console.log('[Game] Broadcasting input:', { localPlayerIndex: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting });
                 }
-                playService.broadcastInput({ index: this._localPlayerIndex, dx: local.dx, dy: local.dy, shooting: local.shooting, burst: local.burst, breaking: local.burst, launchMissile: local.launchMissile, immelmann: local.immelmann });
+                
+                // Get current ship transform for authoritative sync
+                const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                const pos = myShip ? { x: myShip.root.position.x, y: myShip.root.position.y, z: myShip.root.position.z } : undefined;
+                const rot = myShip && myShip.root.rotationQuaternion ? { x: myShip.root.rotationQuaternion.x, y: myShip.root.rotationQuaternion.y, z: myShip.root.rotationQuaternion.z, w: myShip.root.rotationQuaternion.w } : undefined;
+                const missileEvent = !!(missilePressed && myShip && myShip.missileCooldown <= 0 && myShip.bestPrey >= 0 && myShip.bestPreyTime > Parameters.timeToLockMissile && myShip.availableMissiles > 0);
+                const missileTarget = missileEvent && myShip ? myShip.bestPrey : undefined;
+                logicalInput.launchMissile = missileEvent;
+
+                playService.broadcastInput({ 
+                    index: this._localPlayerIndex, 
+                    dx: local.dx, 
+                    dy: local.dy, 
+                    shooting: local.shooting, 
+                    burst: local.burst, 
+                    breaking: local.breaking, // Typo in original code? local.breaking mapped to breaking
+                    launchMissile: missileEvent,
+                    missileTarget,
+                    immelmann: local.immelmann,
+                    pos: pos,
+                    rot: rot
+                });
             } catch { }
 
-            const isHost = this._localPlayerIndex === 0;
-            this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed, isHost);
+            // Determine Host: Lowest active player index
+            const minIndex = this._activePlayerIndices.size > 0 ? Math.min(...Array.from(this._activePlayerIndices)) : this._localPlayerIndex;
+            const isHost = this._localPlayerIndex === minIndex;
+            // Fallback if set is empty (shouldn't happen if I am here): I am host
+            // const isHost = (playService.getRoom()?.master_client_id === playService.getActor()?.session_id);
+            
+            // Debug Log for Co-op Collision Issue
+            if (isHost && this.humanPlayerShips.length > 1) {
+                const p1 = this.humanPlayerShips[0];
+                const p2 = this.humanPlayerShips[1];
+                if (p1 && p1.life < 0 && p2 && p2.life >= 0) {
+                     if (Math.random() < 0.02) {
+                         console.log(`[Game] P1 Dead, P2 Alive. Speed: ${this._speed}. TargetSpeed: ${this._targetSpeed}. P2 Pos: ${p2.root.position}. DeltaTime: ${deltaTime}`);
+                     }
+                }
+            }
+
+            // Capture life before tick to detect death
+            const myShip = this.humanPlayerShips[this._localPlayerIndex];
+            const wasAlive = myShip && myShip.life > 0;
+
+            this._shipManager.tick(canShoot, InputManager.inputs, deltaTime, this._speed, this._sparksEffects, this._explosions, this._world, this._targetSpeed, isHost, this._localPlayerIndex);
+
+            // Client-Side Death Reporting
+            if (wasAlive && myShip && myShip.life <= 0) {
+                 console.log(`[Game] Local player ${this._localPlayerIndex} died. Notifying Host.`);
+                 playService.notifyPlayerDeath(this._localPlayerIndex);
+            }
+
+            if (isHost) {
+                const humanCount = this._gameDefinition.humanAllies + this._gameDefinition.humanEnemies;
+                for (let i = 0; i < humanCount; i++) {
+                    const s = this._shipManager.ships[i];
+                    if (s && s.life <= 0 && !this._reportedPlayerDeaths.has(i)) {
+                        this._reportedPlayerDeaths.add(i);
+                        playService.notifyPlayerDeath(i);
+                    }
+                }
+            }
 
             // Host broadcasts game state periodically
             if (isHost) {
                 gameStateTimer -= deltaTime;
                 if (gameStateTimer <= 0) {
-                    gameStateTimer = 200; // Broadcast every 200ms
+                    gameStateTimer = 100; // Broadcast every 100ms (10Hz)
                     const shipsData = this._shipManager.ships.map((s, idx) => ({
                         index: idx,
                         life: s.life,
@@ -395,7 +560,7 @@ export class Game {
             }
 
             // victory check - Host Only
-            if (this._localPlayerIndex === 0) {
+            if (isHost) {
                 this._checkVictory(scene.getEngine().getDeltaTime() / 1000);
             }
         });
@@ -403,7 +568,8 @@ export class Game {
         try {
             playService.on("remoteInput", (p: any) => {
                 if (!p) return;
-                const idx = typeof p.index === 'number' ? p.index : 1;
+                if (typeof p.index !== "number") return;
+                const idx = p.index;
                 // Remote input targets the logical slot (index + 1)
                 const target = InputManager.getOrCreateInput(idx + 1);
                 target.dx = p.dx || 0;
@@ -414,6 +580,50 @@ export class Game {
                 target.launchMissile = !!p.launchMissile;
                 target.immelmann = !!p.immelmann;
                 target.constrainInput();
+
+                if (p.launchMissile && typeof p.missileTarget === "number") {
+                    const ship = this.humanPlayerShips[idx];
+                    const prey = this._shipManager.ships[p.missileTarget];
+                    if (ship && ship.isValid() && prey && prey.isValid()) {
+                        ship.fireMissile(this._missileManager, prey);
+                        ship.missileCooldown = Parameters.missileCoolDownTime;
+                    }
+                    target.launchMissile = false;
+                }
+
+                if (p.pos && p.rot && idx >= 0 && idx < this.humanPlayerShips.length && idx !== this._localPlayerIndex) {
+                    const ship = this.humanPlayerShips[idx];
+                    if (ship && ship.isValid()) {
+                        ship.root.position.set(p.pos.x, p.pos.y, p.pos.z);
+                        if (ship.root.rotationQuaternion) {
+                            ship.root.rotationQuaternion.set(p.rot.x, p.rot.y, p.rot.z, p.rot.w);
+                        }
+                    }
+                }
+            })
+        } catch { }
+
+        try {
+            playService.on("enemyKilled", (p: any) => {
+                if (!p) return;
+                if (this._isHostNow()) return;
+
+                const enemyIndex = typeof p.enemyIndex === "number" ? p.enemyIndex : p.index;
+                const killerIndex = typeof p.killerIndex === "number" ? p.killerIndex : null;
+                if (typeof enemyIndex !== "number" || enemyIndex < 0 || enemyIndex >= this._shipManager.ships.length) return;
+
+                const victim = this._shipManager.ships[enemyIndex];
+                if (victim && victim.isValid() && !victim.isHuman && victim.faction === 1) {
+                    const pos = victim.root.position.clone();
+                    const rot = victim.root.rotationQuaternion ? victim.root.rotationQuaternion.clone() : Quaternion.Identity();
+                    this._explosions.spawnExplosion(pos, rot);
+                    this._shipManager.destroyShip(enemyIndex);
+                }
+
+                if (killerIndex !== null && killerIndex >= 0 && killerIndex < this._shipManager.ships.length) {
+                    const killerShip = this._shipManager.ships[killerIndex];
+                    killerShip?.statistics?.addShipDestroyed();
+                }
             })
         } catch { }
 
@@ -434,6 +644,21 @@ export class Game {
         */
 
         this._delayedEnd = gameDefinition.delayedEnd;
+    }
+
+    private updatePlayerList() {
+        if (playService.getRoom() && playService.getRoom()!.actors) {
+             const actors = playService.getRoom()!.actors.map(a => ({
+                 name: a.name,
+                 url: (a.properties?.headIconUrl as string) || ""
+             }));
+             GuiFramework.updateTopLeftAvatar(actors);
+        }
+    }
+
+    private _isHostNow(): boolean {
+        const minIndex = this._activePlayerIndices.size > 0 ? Math.min(...Array.from(this._activePlayerIndices)) : this._localPlayerIndex;
+        return this._localPlayerIndex === minIndex;
     }
 
     public getShipManager(): ShipManager {
@@ -470,15 +695,24 @@ export class Game {
 
             if (winnerFaction !== -1) {
                 if (this._delayedEnd <= 0) {
-                     playService.broadcastGameEnd({ winnerFaction: winnerFaction });
-                     if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
-                     
-                     const myShip = this.humanPlayerShips[this._localPlayerIndex];
-                     if (myShip.faction === winnerFaction) {
-                         States.victory.ship = myShip;
-                         State.setCurrent(States.victory);
-                     } else {
-                         State.setCurrent(States.dead);
+                     if (!this._gameResultReported) {
+                        this._gameResultReported = true;
+                        playService.broadcastGameEnd({ winnerFaction: winnerFaction });
+                        if (this._HUD) { this._HUD.dispose(); this._HUD = null; }
+                        
+                        const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                        const isVictory = (myShip.faction === winnerFaction);
+                        const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                        if (!playService.colyseusRoom) {
+                            playService.reportGameResult(kills, isVictory);
+                        }
+
+                        if (isVictory) {
+                            States.victory.ship = myShip;
+                            State.setCurrent(States.victory);
+                        } else {
+                            State.setCurrent(States.dead);
+                        }
                      }
                 }
                 this._delayedEnd -= deltaTime;
@@ -500,34 +734,52 @@ export class Game {
 
             if (!anyHumanAlive) {
                 if (this._delayedEnd <= 0) {
-                    if (this._HUD) {
-                        this._HUD.dispose();
-                        this._HUD = null;
+                    if (!this._gameResultReported) {
+                        this._gameResultReported = true;
+                        if (this._HUD) {
+                            this._HUD.dispose();
+                            this._HUD = null;
+                        }
+                        
+                        const stats = this.humanPlayerShips.map(s => s.statistics);
+                        playService.broadcastGameEnd({ result: "defeat", stats: stats });
+                        
+                        const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                        const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                        if (!playService.colyseusRoom) {
+                            playService.reportGameResult(kills, false);
+                        }
+
+                        States.dead.ship = myShip;
+                        State.setCurrent(States.dead);
                     }
-                    
-                    const stats = this.humanPlayerShips.map(s => s.statistics);
-                    playService.broadcastGameEnd({ result: "defeat", stats: stats });
-                    
-                    States.dead.ship = this.humanPlayerShips[this._localPlayerIndex];
-                    State.setCurrent(States.dead);
                 }
                 this._delayedEnd -= deltaTime;
             }
             else if (!enemyCount) {
                 if (this._delayedEnd <= 0) {
-                    // Just pick the local player or first human for camera focus
-                    const winner = this.humanPlayerShips.find(s => s.isValid()) || this.humanPlayerShips[0];
-                    States.victory.ship = winner;
-                    
-                    const stats = this.humanPlayerShips.map(s => s.statistics);
-                    playService.broadcastGameEnd({ result: "victory", stats: stats });
+                    if (!this._gameResultReported) {
+                        this._gameResultReported = true;
+                        // Just pick the local player or first human for camera focus
+                        const winner = this.humanPlayerShips.find(s => s.isValid()) || this.humanPlayerShips[0];
+                        States.victory.ship = winner;
+                        
+                        const stats = this.humanPlayerShips.map(s => s.statistics);
+                        playService.broadcastGameEnd({ result: "victory", stats: stats });
 
-                    if (this._HUD) {
-                        this._HUD.dispose();
-                        this._HUD = null;
+                        const myShip = this.humanPlayerShips[this._localPlayerIndex];
+                        const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                        if (!playService.colyseusRoom) {
+                            playService.reportGameResult(kills, true);
+                        }
+
+                        if (this._HUD) {
+                            this._HUD.dispose();
+                            this._HUD = null;
+                        }
+                        
+                        State.setCurrent(States.victory);
                     }
-                    
-                    State.setCurrent(States.victory);
                 }
                 this._delayedEnd -= deltaTime;
             }

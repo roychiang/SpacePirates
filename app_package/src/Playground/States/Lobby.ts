@@ -15,7 +15,11 @@ export class Lobby extends State {
   private startBtn?: Button
   private startTimer?: number
   private refreshTimer?: number
+  private autoStartTimer?: number
+  private autoStartCountdown: number = 20
+  private countdownText?: TextBlock
   private isStarting = false
+  private lastPlayerCount: number = 0;
   private onRoomUpdated = () => this.refresh()
   private onActorJoined = () => this.refresh()
   private onActorLeft = () => this.refresh()
@@ -26,6 +30,7 @@ export class Lobby extends State {
   public enter() {
     super.enter()
     this.isStarting = false
+    this.lastPlayerCount = 0
     if (!this._adt) return
     GuiFramework.setOrientation(this._adt)
     GuiFramework.createBottomBar(this._adt)
@@ -41,6 +46,17 @@ export class Lobby extends State {
     GuiFramework.createPageTitle(`Lobby [${mode}]`, content)
     this.playersPanel = new StackPanel()
     content.addControl(this.playersPanel, 1, 1)
+
+    // Countdown Text
+    this.countdownText = new TextBlock();
+    this.countdownText.text = "Auto-starting in 20...";
+    this.countdownText.color = "#f39c12"; 
+    this.countdownText.fontSize = 24;
+    this.countdownText.height = "40px";
+    this.countdownText.isVisible = false;
+    GuiFramework.setFont(this.countdownText, true, true);
+    panel.addControl(this.countdownText);
+
     const leaveBtn = GuiFramework.addButton("Leave Room", panel)
     this.startBtn = GuiFramework.addButton("Start Game", panel)
     this.startBtn.isVisible = false // Initially hidden, shown only for host when room is full
@@ -97,7 +113,17 @@ export class Lobby extends State {
       playersText.topInPixels = 26
       avatarGrid.addControl(playersText, 1, 1)
     }
+    // Hook into refresh to detect new players and reset timer (Host only)
     const updatePlayers = () => {
+      // Refresh top left list with ALL actors
+      if (playService.getRoom() && playService.getRoom()!.actors) {
+          const actors = playService.getRoom()!.actors.map(a => ({
+              name: a.name,
+              url: (a.properties?.headIconUrl as string) || ""
+          }));
+          GuiFramework.updateTopLeftAvatar(actors);
+      }
+
       playService.getAvailableRooms().then(res => {
         const rooms = (res && res.rooms) ? res.rooms : []
         const appId = playService.getAppId()
@@ -107,10 +133,16 @@ export class Lobby extends State {
           return sameApp || sameGame
         })
         const total = filtered.reduce((acc: number, r: any) => acc + ((Array.isArray(r.actors) ? r.actors.length : 0) || 0), 0)
+        
+        // Ensure we count the current room's players if they weren't included (e.g. room not in list)
+        const currentRoom = playService.getRoom();
+        const currentRoomCount = (currentRoom && currentRoom.actors) ? currentRoom.actors.length : 0;
+        const displayTotal = Math.max(total, currentRoomCount);
+
         const t = avatarGrid.children.find(c => c.name === "globalPlayersOnline") as TextBlock
         if (t) {
             t.text = ""
-            t.text = `Players Online: ${total}`
+            t.text = `Players Online: ${displayTotal}`
         }
       }).catch(() => {})
     }
@@ -150,12 +182,25 @@ export class Lobby extends State {
       console.log(`[Lobby] Using room.actors: SDK returned ${sdkActorCount} but room has ${roomActorCount}`)
       actors = room!.actors
     }
-    if (me && (!actors.find(a => a.session_id === me.session_id))) {
+    if (me && (!actors.find(a => a.session_id === me.session_id || (a.userId && a.userId === me.session_id) || (a.name === me.name)))) {
       actors = (actors || []).concat([me])
     }
+    
+    const mySessionId = (playService as any).colyseusRoom?.sessionId || me?.session_id || ""
+    const isOwner = !!mySessionId && !!ownerId && mySessionId === ownerId;
 
     const minPlayers = room ? (room.min_players || 2) : 2
     const isFull = actors.length >= minPlayers
+    
+    // Host Logic: Check for new players to reset countdown
+    const currentCount = actors.length;
+    if (isOwner && currentCount > this.lastPlayerCount && currentCount >= 2 && !this.isStarting) {
+         // Player joined and we have enough players -> Reset countdown
+         console.log(`[Lobby] Player count increased (${this.lastPlayerCount} -> ${currentCount}), resetting countdown.`);
+         const now = Date.now();
+         playService.updateRoomProperties({ target_start_time: now + 20000 });
+    }
+    this.lastPlayerCount = currentCount;
 
     for (const a of actors) {
       const row = new Grid()
@@ -219,7 +264,7 @@ export class Lobby extends State {
       row.addControl(ready, 0, 3)
       this.playersPanel.addControl(row)
     }
-    const isOwner = !!me && !!ownerId && me.session_id === ownerId
+    // const isOwner variable is now declared earlier, remove duplicate declaration
 
     // Show Start Game button only for host when room is full
     if (this.startBtn) {
@@ -227,9 +272,82 @@ export class Lobby extends State {
       this.startBtn.isEnabled = isOwner && isFull
     }
 
+    // Auto-start logic (Host triggers start, all clients sync countdown via room properties)
+    const playerCount = actors.length;
+    
+    // Check if countdown target time is set in room properties
+    const targetTime = (room && room.properties && room.properties.target_start_time) ? Number(room.properties.target_start_time) : 0;
+    
+    if (playerCount >= 2 && !this.isStarting) {
+        if (isOwner) {
+             // Host Logic: Start or Reset countdown if needed
+             const now = Date.now();
+             const remaining = targetTime - now;
+             
+             // If no timer or timer expired/invalid, start new one
+             if (targetTime === 0 || remaining <= 0) {
+                 if (targetTime === 0) {
+                     console.log("[Lobby] Host starting new countdown (20s)...");
+                     playService.updateRoomProperties({ target_start_time: now + 20000 });
+                 } else if (remaining <= -2000) { // Tolerance for slight diff
+                      // Timer finished long ago? Reset if not started?
+                      // Actually if game_started is false but timer finished, we should have started.
+                      // But maybe we just became host.
+                 }
+             }
+        }
+        
+        // Client Logic: Update UI based on server time
+        if (targetTime > 0) {
+             const remainingSeconds = Math.ceil((targetTime - Date.now()) / 1000);
+             
+             if (remainingSeconds > 0) {
+                 if (this.countdownText) {
+                     this.countdownText.isVisible = true;
+                     this.countdownText.text = `Auto-starting in ${remainingSeconds}...`;
+                 }
+                 
+                 // Host: Check if time to start
+                 if (isOwner && remainingSeconds <= 0) { // Should be caught by next tick or loop
+                 }
+             } else {
+                 if (this.countdownText) {
+                    this.countdownText.text = "Starting...";
+                 }
+                 if (isOwner && !this.isStarting) {
+                     console.log("[Lobby] Countdown finished, Host starting game...");
+                     // Bake configuration before starting
+                     const count = Math.min(4, playerCount);
+                     const aiAllies = Math.max(0, 4 - count);
+                     playService.updateRoomProperties({ 
+                         game_started: true, 
+                         config_human_count: count,
+                         config_ai_count: aiAllies
+                     });
+                     this.tryStart();
+                 }
+             }
+        }
+    } else {
+        // Less than 2 players
+        if (isOwner && targetTime > 0) {
+            console.log("[Lobby] Player count dropped < 2, clearing countdown.");
+            playService.updateRoomProperties({ target_start_time: 0 });
+        }
+        if (this.countdownText) {
+            this.countdownText.isVisible = false;
+        }
+    }
+
+    if (isOwner && playerCount > this.lastPlayerCount && playerCount >= 2 && !this.isStarting) {
+         console.log(`[Lobby] Player count increased (${this.lastPlayerCount} -> ${playerCount}), resetting countdown.`);
+         const now = Date.now();
+         playService.updateRoomProperties({ target_start_time: now + 20000 });
+    }
+    this.lastPlayerCount = playerCount;
+
     // Check if game has been started via room properties
     if (room && room.properties) {
-      // console.log("[Lobby] Checking game_started", room.properties.game_started)
       if (room.properties.game_started === true || room.properties.game_started === "true") {
         console.log("[Lobby] Game started detected, transitioning to game")
         this.tryStart()
@@ -237,12 +355,18 @@ export class Lobby extends State {
     }
   }
 
+  // Hook into refresh to detect new players and reset timer (Host only)
+  // ... inside refresh() ...
+
+
   public exit() {
     super.exit()
     this.playersPanel = undefined
     this.startBtn = undefined
+    this.countdownText = undefined
     if (this.startTimer) { window.clearTimeout(this.startTimer); this.startTimer = undefined }
     if (this.refreshTimer) { window.clearInterval(this.refreshTimer); this.refreshTimer = undefined }
+    if (this.autoStartTimer) { window.clearInterval(this.autoStartTimer); this.autoStartTimer = undefined }
     ; (playService as any).off?.("roomUpdated", this.onRoomUpdated)
     ; (playService as any).off?.("actorJoined", this.onActorJoined)
     ; (playService as any).off?.("actorLeft", this.onActorLeft)
@@ -272,7 +396,21 @@ export class Lobby extends State {
     this.isStarting = true
 
     const room = playService.getRoom()
-    const count = room ? Math.min(2, (room.actors || []).length) : 1
+    // Use configuration from properties if available, otherwise fallback to current state
+    let count = room ? Math.min(4, (room.actors || []).length) : 1
+    let aiAllies = Math.max(0, 4 - count)
+    
+    if (room && room.properties) {
+        if (room.properties.config_human_count !== undefined) {
+            count = Number(room.properties.config_human_count);
+            console.log(`[Lobby] Using configured human count: ${count}`);
+        }
+        if (room.properties.config_ai_count !== undefined) {
+            aiAllies = Number(room.properties.config_ai_count);
+            console.log(`[Lobby] Using configured AI count: ${aiAllies}`);
+        }
+    }
+
     const gameMode = room?.properties?.game_mode || "coop"
     console.log("[Lobby] tryStart: gameMode detected as:", gameMode, "raw:", room?.properties?.game_mode);
 
@@ -287,7 +425,7 @@ export class Lobby extends State {
       def.humanAllies = count
       def.humanEnemies = 0
       // Ensure total allies = 4 (Humans + AI)
-      def.aiAllies = Math.max(0, 4 - count)
+      def.aiAllies = aiAllies
       console.log("[Lobby] Co-op mode: humanAllies=" + count + ", aiAllies=" + def.aiAllies)
     }
 
@@ -302,7 +440,8 @@ export class Lobby extends State {
 
     const me = (playService as any).getActor ? (playService as any).getActor() : undefined
     const ownerId = room ? room.master_client_id : ""
-    const isOwner = !!me && !!ownerId && me.session_id === ownerId
+    const mySessionId = (playService as any).colyseusRoom?.sessionId || me?.session_id || ""
+    const isOwner = !!mySessionId && !!ownerId && mySessionId === ownerId
 
     if (isOwner) {
       // Generate AI config

@@ -392,6 +392,9 @@ export class ShipManager {
     private static _tmpMatrix = new Matrix;
     //private _glowLayer: GlowLayer;
 
+    public onEnemyKilled: (killer: Ship, victimIndex: number) => void = () => {};
+    public onShipDestroyed: (shipIndex: number) => void = () => {};
+
     constructor(missileManager: MissileManager, shotManager: ShotManager, assets: Assets, trailManager: TrailManager, scene: Scene, maxShips: number, gameDefinition: GameDefinition, glowLayer: GlowLayer) {
         this._gameDefinition = gameDefinition;
         this._missileManager = missileManager;
@@ -426,6 +429,11 @@ export class ShipManager {
     destroyShip(shipIndex: number) {
         console.log(`destroying ${shipIndex}`)
         const ship = this.ships[shipIndex];
+        // Ensure life is invalid so isValid() returns false
+        ship.life = -1;
+        
+        this.onShipDestroyed(shipIndex);
+
         this._shotManager.shots.forEach(shot => {
             if (shot.firedBy === ship) {
                 shot.firedBy = undefined;
@@ -495,7 +503,7 @@ export class ShipManager {
         return count;
     }
 
-    public tick(canShoot: boolean, humanInputs: Input[], deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number, isHost: boolean = true): void {
+    public tick(canShoot: boolean, humanInputs: Input[], deltaTime: number, gameSpeed: number, sparksEffects: SparksEffects, explosionManager: ExplosionManager, world: World, targetGameSpeed: number, isHost: boolean = true, localPlayerIndex: number = -1): void {
         if (gameSpeed <= 0.001) {
             return;
         }
@@ -551,7 +559,14 @@ export class ShipManager {
                     this._assets.audio.thrusterSound.setVolume(Math.max(0, ship.bursting / 2));
                 }
             }
-            if (isHost) {
+            // HOST ONLY or LOCAL PLAYER: check collisions with asteroids
+            // If Host, check everyone. If Client, check only self (and report death via Game.ts monitoring)
+            // controlIndex is 1-based (0 is physical), so localPlayerIndex + 1 matches controlIndex for local player
+            const isLocal = ship.isHuman && ship.controlIndex === (localPlayerIndex + 1);
+            if (isHost || isLocal) {
+                if (ship.isHuman && this.ships.indexOf(ship) === 1 && Math.random() < 0.01) { // Log for Player 2
+                     console.log(`[ShipManager] _tickAsteroids for P2. Pos: ${ship.root.position.toString()}. isHost: ${isHost}, isLocal: ${isLocal}`);
+                }
                 this._tickAsteroids(ship, world, explosionManager);
             }
             this._tickEndOfLife(ship, index);
@@ -583,7 +598,14 @@ export class ShipManager {
     }
 
     private _tickAsteroids(ship: Ship, world: World, explosionManager: ExplosionManager): void {
-        if (world.collideWithAsteroids(ship.root.position, 1.0)) {
+        const collided = world.collideWithAsteroids(ship.root.position, 1.0);
+        // Debug logging for co-op collision bug
+        if (ship.isHuman && this.ships.indexOf(ship) === 1) { // Log for Player 2
+             // console.log(`[ShipManager] _tickAsteroids for P2. Pos: ${ship.root.position}. Collided: ${collided}. Life: ${ship.life}`);
+        }
+        
+        if (collided) {
+            console.log(`[ShipManager] Collision Detected for Ship ${this.ships.indexOf(ship)} at ${ship.root.position}`);
             ship.life = -1;
             explosionManager.spawnExplosion(ship.root.position.clone(), ship.root.rotationQuaternion ? ship.root.rotationQuaternion : Quaternion.Identity());
             if (ship.faction) {
@@ -601,9 +623,6 @@ export class ShipManager {
                 const rand = Math.floor(Math.random() * ship.explosionSfx.length);
                 ship.explosionSfx[rand].setPosition(ship.position);
                 ship.explosionSfx[rand].play();
-            }
-            if (ship.isHuman) {
-                States.dead.ship = ship;
             }
             this.destroyShip(index);
         }
@@ -755,15 +774,18 @@ export class ShipManager {
             if (missile.shipToChase == ship) {
                 const dist = Vector3.DistanceSquared(missile.getPosition(), ship.root.position);
                 if (dist < 200) {
-                    if (isHost) {
+                    // Allow damage on all clients for immediate feedback
+                    // Sync will handle correction
+                    // if (isHost) {
                         ship.life -= this._gameDefinition.missileDamage;
                         ship.statistics?.addDamageTaken();
-                    }
+                    // }
                     missile.setTime(MISSILE_MAX_LIFE + 1);
                     // Ship died to missile
                     if (ship.life <= 0) {
                         explosionManager.spawnExplosion(ship.root.position.clone(), ship.root.rotationQuaternion ? ship.root.rotationQuaternion : Quaternion.Identity());
                         missile.firedBy?.statistics?.addShipDestroyed();
+                        if (missile.firedBy) this.onEnemyKilled(missile.firedBy!, this.ships.indexOf(ship));
                     }
                 }
             }
@@ -834,6 +856,7 @@ export class ShipManager {
                     if (ship.life <= 0) {
                         explosionManager.spawnExplosion(ship.root.position, ship.root.rotationQuaternion ? ship.root.rotationQuaternion : Quaternion.Identity());
                         pewpews[p].firedBy?.statistics?.addShipDestroyed();
+                        if (pewpews[p].firedBy) this.onEnemyKilled(pewpews[p].firedBy!, this.ships.indexOf(ship));
                     } else {
                         if (ship.laserHit) {
                             ship.laserHit.play();

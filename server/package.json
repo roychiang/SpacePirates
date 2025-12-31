@@ -21,8 +21,14 @@
         "@colyseus/schema": "^2.0.0",
         "colyseus": "^0.15.0",
         "cors": "^2.8.5",
+        "dotenv": "^16.0.3",
         "express": "^4.18.2",
-        "proving_ground": "file:.."
+        "peer": "^0.6.1",
+        "proving_ground": "file:..",
+        "ws": "^8.18.0"
+    },
+    "overrides": {
+        "ws": "^8.18.0"
     },
     "devDependencies": {
         "@types/cors": "^2.8.13",

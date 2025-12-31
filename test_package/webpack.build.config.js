@@ -22,8 +22,7 @@ module.exports = {
         }),
         new HtmlWebpackPlugin({
             title: "Space Pirates made with Babylon.js",
-            template: path.resolve(__dirname, "src/index.html"),
-            hash: true // Append a unique webpack compilation hash to all included scripts and CSS files.
+            template: path.resolve(__dirname, "src/index.html")
         }),
         new CopyWebpackPlugin({
             patterns: [

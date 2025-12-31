@@ -9,7 +9,7 @@ module.exports = {
     devServer: {
         open: true,
         watchFiles: ["./src/**/*", "../app_package/lib/**/*"],
-        port: 8081,
+        port: 8080,
         headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
