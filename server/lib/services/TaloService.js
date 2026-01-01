@@ -19,8 +19,14 @@ class TaloService {
     }
     static requireAccessKey() {
         const k = this.accessKey;
-        if (!k)
-            throw new Error("TALO_ACCESS_KEY is not set");
+        if (!k) {
+            // Log once and return empty to prevent hard crashes if key is missing in dev
+            if (!this.blockedReason) {
+                console.warn("[TaloService] TALO_ACCESS_KEY is not set. Leaderboard/Stats will be disabled.");
+                this.blockedReason = "TALO_ACCESS_KEY is not set";
+            }
+            return "";
+        }
         return k;
     }
     static identifyAliasId(identifier) {
@@ -70,10 +76,10 @@ class TaloService {
                 // For TotalStats, we need to fetch the current value first, then add to it.
                 // Or use Talo Stats if available, but here we use Leaderboards as storage.
                 // Update Total Kills
-                yield this.incrementLeaderboardScore("TotalKills", kills, playerIdentifier);
+                yield this.incrementLeaderboardScore("TotalKillsCoop", kills, playerIdentifier);
                 // Update Total Wins
                 if (wins > 0) {
-                    yield this.incrementLeaderboardScore("TotalWins", wins, playerIdentifier);
+                    yield this.incrementLeaderboardScore("TotalWinsCoop", wins, playerIdentifier);
                 }
                 // HighScore (Max)
                 // For HighScore, we usually want to submit the *current game score*. 
@@ -81,7 +87,6 @@ class TaloService {
                 yield this.submitToLeaderboard("HighScore", score, playerIdentifier);
             }
             catch (e) {
-                console.error("[TaloService] Failed to report score:", e);
             }
         });
     }
@@ -98,7 +103,6 @@ class TaloService {
                 try {
                     const aliasId = yield this.identifyAliasId(playerIdentifier);
                     const url = `${this.baseUrl}/leaderboards/${alias}/entries?page=0&aliasId=${encodeURIComponent(String(aliasId))}`;
-                    console.log(`[TaloService] Fetching current score from: ${url}`);
                     const res = yield fetch(url, {
                         headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
                     });
@@ -107,25 +111,19 @@ class TaloService {
                         if (data.entries && data.entries.length > 0) {
                             const first = data.entries[0];
                             currentScore = parseFloat(first === null || first === void 0 ? void 0 : first.score) || 0;
-                            console.log(`[TaloService] Found existing score for ${playerIdentifier} in ${alias}: ${currentScore}`);
                         }
                         else {
-                            console.log(`[TaloService] No entries found for ${alias}, starting from 0.`);
                         }
                     }
                     else {
-                        console.warn(`[TaloService] Fetch entries failed: ${res.status} ${res.statusText}`);
                     }
                 }
                 catch (fetchErr) {
-                    console.warn(`[TaloService] Failed to fetch current score for ${alias}, starting from 0. Error:`, fetchErr);
                 }
                 const newScore = currentScore + incrementBy;
-                console.log(`[TaloService] Incrementing ${alias}: ${currentScore} + ${incrementBy} = ${newScore}`);
                 yield this.submitToLeaderboard(alias, newScore, playerIdentifier);
             }
             catch (e) {
-                console.error(`[TaloService] Failed to increment ${alias}`, e);
             }
         });
     }
@@ -148,14 +146,12 @@ class TaloService {
                 });
                 if (!res.ok) {
                     const text = yield res.text().catch(() => "");
-                    console.error(`[TaloService] Failed to fetch entries for ${alias}: ${res.status} ${res.statusText}`, text);
                     return { entries: [], error: `upstream ${res.status}` };
                 }
                 const data = yield res.json();
                 return data;
             }
             catch (e) {
-                console.error("[TaloService] getLeaderboardEntries failed", e);
                 return { entries: [], error: (e === null || e === void 0 ? void 0 : e.message) ? String(e.message) : String(e) };
             }
         });
@@ -170,7 +166,6 @@ class TaloService {
                 return data.leaderboards || [];
             }
             catch (e) {
-                console.error("[TaloService] getLeaderboards failed", e);
                 return [];
             }
         });
@@ -196,10 +191,8 @@ class TaloService {
                     const text = yield res.text().catch(() => "");
                     throw new Error(`Submit failed: ${res.status} ${res.statusText}${text ? ` - ${text}` : ""}`);
                 }
-                console.log(`[TaloService] Updated leaderboard ${alias} with score ${score}`);
             }
             catch (e) {
-                console.error(`[TaloService] Failed to update leaderboard ${alias}`, e);
             }
         });
     }

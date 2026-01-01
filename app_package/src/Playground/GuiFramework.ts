@@ -276,7 +276,7 @@ export class GuiFramework {
         const extras: Control[] = [];
         panel.children.forEach(c => {
              // Keep "globalPlayersOnline" and potentially other UI elements not related to player list
-             if (c.name === "globalPlayersOnline" || (!c.name.startsWith("globalAvatar") && !c.name.startsWith("pEntry_"))) {
+             if (c.name === "globalPlayersOnline" || (!c.name?.startsWith("globalAvatar") && !c.name?.startsWith("pEntry_"))) {
                  extras.push(c);
              }
         });

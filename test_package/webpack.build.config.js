@@ -18,7 +18,8 @@ module.exports = {
     },
     plugins: [
         new DefinePlugin({
-            DEV_BUILD: JSON.stringify(false)
+            DEV_BUILD: JSON.stringify(false),
+            "process.env.VIVERSE_CLIENT_ID": JSON.stringify(process.env.VIVERSE_CLIENT_ID || "4p4wmv9d5z")
         }),
         new HtmlWebpackPlugin({
             title: "Space Pirates made with Babylon.js",

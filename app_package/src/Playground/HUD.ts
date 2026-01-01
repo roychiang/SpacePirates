@@ -708,10 +708,11 @@ export class HUD {
                 }
 
                 // Manually update position to handle off-screen clamping
+                const activeCamera = this._adt.getScene()?.activeCamera;
                 if (localShip && localShip.shipCamera) {
                     this._updateLabelPosition(engine, localShip.shipCamera.getFreeCamera(), ship.root.position, label);
-                } else if (this._adt.getScene().activeCamera) {
-                    this._updateLabelPosition(engine, this._adt.getScene().activeCamera!, ship.root.position, label);
+                } else if (activeCamera) {
+                    this._updateLabelPosition(engine, activeCamera, ship.root.position, label);
                 }
             } else {
                 const label = this._playerLabels.get(shipIndex);
