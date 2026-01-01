@@ -58,23 +58,11 @@ export class Assets {
         // Remove trailing slash from baseUrl and leading slash from path to avoid double slashes
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
         const cleanPath = path.replace(/^\//, '');
-        const result = `${cleanBaseUrl}/${cleanPath}`;
-        
-        // Comprehensive debug logging to track URL construction
-        console.log(`[DEBUG joinUrl] CALLED: baseUrl='${baseUrl}', path='${path}'`);
-        console.log(`[DEBUG joinUrl] CLEANED: cleanBaseUrl='${cleanBaseUrl}', cleanPath='${cleanPath}'`);
-        console.log(`[DEBUG joinUrl] RESULT: '${result}'`);
-        console.log(`[DEBUG joinUrl] HAS_DOUBLE_SLASH: ${result.includes('//')}`);
-        
-        return result;
+        return `${cleanBaseUrl}/${cleanPath}`;
     }
 
     constructor(scene:Scene, assetsHostUrl: string, whenReady: (assets:Assets) => void, whenLoadingComplete: (assets:Assets) => void)
     {
-        // Debug logging for assetsHostUrl
-        console.log(`[DEBUG Assets] Constructor called with assetsHostUrl: '${assetsHostUrl}'`);
-        console.log(`[DEBUG Assets] assetsHostUrl ends with slash: ${assetsHostUrl.endsWith('/')}`);
-        console.log(`[DEBUG Assets] assetsHostUrl length: ${assetsHostUrl.length}`);
             var _this = this;
         this.assetsHostUrl = assetsHostUrl;
         Assets.globalAssetsHostUrl = assetsHostUrl;

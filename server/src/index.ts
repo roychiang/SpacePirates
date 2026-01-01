@@ -155,15 +155,8 @@ app.post("/api/events", async (req, res) => {
     }
 });
 
-// Colyseus Monitor (Protected by MONITOR_TOKEN)
-const monitorToken = process.env.MONITOR_TOKEN;
-app.use("/colyseus", (req, res, next) => {
-    if (monitorToken && req.query.token !== monitorToken) {
-        res.status(403).send("Forbidden: Invalid MONITOR_TOKEN");
-        return;
-    }
-    next();
-}, monitor());
+// Colyseus Monitor
+app.use("/colyseus", monitor());
 
 // Auth API skeleton
 const memoryPlayers: Map<string, { id: string; nickname: string; avatar_url: string; viverse_user_id?: string }> = new Map();

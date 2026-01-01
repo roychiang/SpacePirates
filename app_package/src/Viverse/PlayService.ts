@@ -305,6 +305,10 @@ export class PlayService {
 
     try {
       const rooms = await (this.client as any).getAvailableRooms("game_room");
+      if (!Array.isArray(rooms)) {
+        console.warn("getAvailableRooms: Expected array but got", rooms);
+        return { success: false, rooms: [] };
+      }
       const mapped: Room[] = rooms.map((r: any) => {
         let count = r.clients;
         if (r.metadata && r.metadata.playerCount !== undefined && r.metadata.playerCount !== null) {

@@ -134,6 +134,39 @@ app.get("/api/leaderboard/:alias", (req, res) => __awaiter(void 0, void 0, void 
         res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
 }));
+app.post("/api/events", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { eventName, props, identity } = req.body;
+        if (!eventName || !identity) {
+            res.status(400).json({ error: "Missing eventName or identity" });
+            return;
+        }
+        // 1. Always track the event
+        yield TaloService_1.TaloService.addEvent(eventName, props, identity);
+        // 2. Special handling for game_end to update leaderboards (Mirroring Server GameRoom logic)
+        // This ensures Single Player (Offline) games also update leaderboards via this API proxy.
+        if (eventName === "game_end" && props) {
+            const kills = Number(props.kills) || 0;
+            const win = !!props.win;
+            const score = Number(props.score) || 0;
+            if (kills > 0) {
+                yield TaloService_1.TaloService.incrementLeaderboardScore("TotalKillsSingle", kills, identity);
+            }
+            if (win) {
+                yield TaloService_1.TaloService.incrementLeaderboardScore("TotalWinsSingle", 1, identity);
+            }
+            if (score > 0) {
+                yield TaloService_1.TaloService.submitToLeaderboard("HighScore", score, identity);
+            }
+        }
+        res.json({ success: true });
+    }
+    catch (e) {
+        console.error("[API] Event error:", e);
+        res.status(500).json({ error: "Internal Error" });
+    }
+}));
+// Colyseus Monitor
 app.use("/colyseus", (0, monitor_1.monitor)());
 // Auth API skeleton
 const memoryPlayers = new Map();
