@@ -71,13 +71,16 @@ export class PlayService {
     this.actor = actor
     console.log("[Play] setActor", actor)
     
-    const identity =
-      (this.actor?.userId && String(this.actor.userId)) ||
-      (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
-      (this.actor?.session_id ? String(this.actor.session_id) : "");
-    
+    // Attempt to sync player name to Talo immediately if we have an identity
+    const identity = this.getIdentity();
+    const name = actor?.name || (actor?.properties as any)?.displayName;
+
     if (identity) {
+      // TaloClient needs identity set first
       TaloClient.identify(identity);
+      if (name) {
+        TaloClient.updatePlayer(name);
+      }
     }
 
     this.emit("actorJoined", actor)
@@ -131,14 +134,7 @@ export class PlayService {
       
       let displayName = this.actor?.name ? String(this.actor.name) : "";
       if (!displayName) {
-          if (userId.startsWith("Guest_")) {
-              displayName = userId;
-          } else {
-              if (!this._guestIdentity) {
-                   this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
-              }
-              displayName = this._guestIdentity;
-          }
+          displayName = userId;
       }
 
       const options = {
@@ -226,14 +222,7 @@ export class PlayService {
 
       let displayName = this.actor?.name ? String(this.actor.name) : "";
       if (!displayName) {
-          if (userId.startsWith("Guest_")) {
-              displayName = userId;
-          } else {
-              if (!this._guestIdentity) {
-                   this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
-              }
-              displayName = this._guestIdentity;
-          }
+          displayName = userId;
       }
 
       const options = {
@@ -392,19 +381,20 @@ export class PlayService {
   }
 
   private getIdentity(): string {
-    let identity =
-      (this.actor?.userId && String(this.actor.userId)) ||
-      (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
-      (this.actor?.session_id ? String(this.actor.session_id) : "") ||
-      (this.colyseusRoom?.sessionId ? String(this.colyseusRoom.sessionId) : "");
+    // Priority 1: Persistent User ID (Viverse)
+    if (this.actor?.userId) return String(this.actor.userId);
+    if (this.actor?.properties && (this.actor.properties as any).userId) return String((this.actor.properties as any).userId);
     
-    if (!identity) {
-        if (!this._guestIdentity) {
-            this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
-        }
-        identity = this._guestIdentity;
+    // Priority 2: Persistent Guest ID
+    // We do NOT want to use session_id as identity because it changes per game/room.
+    if (!this._guestIdentity) {
+        this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
+        // Proactively update name for this new guest identity
+        console.log("[Play] Generated new Guest Identity:", this._guestIdentity);
+        TaloClient.identify(this._guestIdentity);
+        TaloClient.updatePlayer(this._guestIdentity);
     }
-    return identity;
+    return this._guestIdentity;
   }
 
   async getPlayerStats(mode?: "single" | "coop"): Promise<{ kills: number; wins: number }> {

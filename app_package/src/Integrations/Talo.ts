@@ -128,4 +128,29 @@ export class TaloClient {
              console.error("[Talo] addEvent failed", e);
         }
     }
+
+    public static async updatePlayer(name: string) {
+        if (!this._identity) return;
+        console.log(`[Talo] updatePlayer: Updating name to "${name}" for ${this._identity}`);
+        try {
+            let endpoint = Config.getColyseusEndpoint().replace("wss://", "https://").replace("ws://", "http://");
+            if (!endpoint || endpoint.includes("undefined")) {
+                 endpoint = window.location.origin;
+            }
+            const url = `${endpoint}/api/players`;
+            
+            const body = {
+                identity: this._identity,
+                props: { name }
+            };
+
+            await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+        } catch (e) {
+             console.error("[Talo] updatePlayer failed", e);
+        }
+    }
 }

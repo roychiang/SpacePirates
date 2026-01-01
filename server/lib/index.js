@@ -161,6 +161,22 @@ app.post("/api/events", (req, res) => __awaiter(void 0, void 0, void 0, function
         res.status(500).json({ error: "Internal Error" });
     }
 }));
+app.post("/api/players", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { identity, props } = req.body;
+        if (!identity || !props || !props.name) {
+            res.status(400).json({ error: "Missing identity or props.name" });
+            return;
+        }
+        // Update Player Name
+        yield TaloService_1.TaloService.updatePlayer(identity, props.name);
+        res.json({ success: true });
+    }
+    catch (e) {
+        console.error("[API] Player update error:", e);
+        res.status(500).json({ error: "Internal Error" });
+    }
+}));
 // Colyseus Monitor
 app.use("/colyseus", (0, monitor_1.monitor)());
 // Auth API skeleton

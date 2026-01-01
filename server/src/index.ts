@@ -150,6 +150,23 @@ app.post("/api/events", async (req, res) => {
     }
 });
 
+app.post("/api/players", async (req, res) => {
+    try {
+        const { identity, props } = req.body;
+        if (!identity || !props || !props.name) {
+            res.status(400).json({ error: "Missing identity or props.name" });
+            return;
+        }
+        
+        // Update Player Name
+        await TaloService.updatePlayer(identity, props.name);
+        res.json({ success: true });
+    } catch (e) {
+        console.error("[API] Player update error:", e);
+        res.status(500).json({ error: "Internal Error" });
+    }
+});
+
 // Colyseus Monitor
 app.use("/colyseus", monitor());
 

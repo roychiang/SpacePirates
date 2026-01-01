@@ -242,8 +242,12 @@ export class TaloService {
                     "x-talo-alias": String(aliasId)
                 },
                 body: JSON.stringify({
-                    key: eventName,
-                    props: props
+                    events: [
+                        {
+                            key: eventName,
+                            props: props
+                        }
+                    ]
                 })
             });
             if (!res.ok) {
