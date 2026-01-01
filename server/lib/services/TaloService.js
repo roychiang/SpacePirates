@@ -75,15 +75,21 @@ class TaloService {
                 const urlIdentify = new URL(`${this.baseUrl}/players/identify`);
                 urlIdentify.searchParams.set("service", service);
                 urlIdentify.searchParams.set("identifier", identifier);
+                // Expand player to ensure we get the player object if possible, though player_id usually exists on alias
+                urlIdentify.searchParams.set("expand", "player");
                 const resIdentify = yield fetch(urlIdentify.toString(), {
                     headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
                 });
-                if (!resIdentify.ok)
+                if (!resIdentify.ok) {
+                    console.warn(`[TaloService] updatePlayer: Identify failed ${resIdentify.status}`);
                     return;
+                }
                 const dataIdentify = yield resIdentify.json();
-                const playerId = (_a = dataIdentify === null || dataIdentify === void 0 ? void 0 : dataIdentify.player) === null || _a === void 0 ? void 0 : _a.id;
-                if (!playerId)
+                const playerId = ((_a = dataIdentify === null || dataIdentify === void 0 ? void 0 : dataIdentify.player) === null || _a === void 0 ? void 0 : _a.id) || (dataIdentify === null || dataIdentify === void 0 ? void 0 : dataIdentify.player_id) || (dataIdentify === null || dataIdentify === void 0 ? void 0 : dataIdentify.playerId);
+                if (!playerId) {
+                    console.warn(`[TaloService] updatePlayer: No playerId found in identify response`, dataIdentify);
                     return;
+                }
                 // 2. Update Player Properties
                 const urlUpdate = `${this.baseUrl}/players/${playerId}`;
                 yield fetch(urlUpdate, {

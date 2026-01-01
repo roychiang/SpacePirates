@@ -69,16 +69,24 @@ export class TaloService {
             const urlIdentify = new URL(`${this.baseUrl}/players/identify`);
             urlIdentify.searchParams.set("service", service);
             urlIdentify.searchParams.set("identifier", identifier);
+            // Expand player to ensure we get the player object if possible, though player_id usually exists on alias
+            urlIdentify.searchParams.set("expand", "player");
 
             const resIdentify = await fetch(urlIdentify.toString(), {
                 headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
             });
 
-            if (!resIdentify.ok) return;
+            if (!resIdentify.ok) {
+                 console.warn(`[TaloService] updatePlayer: Identify failed ${resIdentify.status}`);
+                 return;
+            }
             const dataIdentify = await resIdentify.json();
-            const playerId = dataIdentify?.player?.id;
+            const playerId = dataIdentify?.player?.id || dataIdentify?.player_id || dataIdentify?.playerId;
 
-            if (!playerId) return;
+            if (!playerId) {
+                 console.warn(`[TaloService] updatePlayer: No playerId found in identify response`, dataIdentify);
+                 return;
+            }
 
             // 2. Update Player Properties
             const urlUpdate = `${this.baseUrl}/players/${playerId}`;
