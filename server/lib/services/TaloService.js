@@ -64,26 +64,65 @@ class TaloService {
             return aliasId;
         });
     }
-    static reportScore(sessionId, score, kills, wins, playerIdentifier) {
+    static updatePlayer(identifier, name) {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a;
             try {
                 if (this.blockedReason)
                     return;
-                console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}`);
+                const service = String(process.env.TALO_IDENTITY_SERVICE || "username");
+                // 1. Identify to get Player ID
+                const urlIdentify = new URL(`${this.baseUrl}/players/identify`);
+                urlIdentify.searchParams.set("service", service);
+                urlIdentify.searchParams.set("identifier", identifier);
+                const resIdentify = yield fetch(urlIdentify.toString(), {
+                    headers: { "Authorization": `Bearer ${this.requireAccessKey()}` }
+                });
+                if (!resIdentify.ok)
+                    return;
+                const dataIdentify = yield resIdentify.json();
+                const playerId = (_a = dataIdentify === null || dataIdentify === void 0 ? void 0 : dataIdentify.player) === null || _a === void 0 ? void 0 : _a.id;
+                if (!playerId)
+                    return;
+                // 2. Update Player Properties
+                const urlUpdate = `${this.baseUrl}/players/${playerId}`;
+                yield fetch(urlUpdate, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${this.requireAccessKey()}`
+                    },
+                    body: JSON.stringify({
+                        props: {
+                            name: name
+                        }
+                    })
+                });
+                console.log(`[TaloService] Updated player name for ${identifier} to ${name}`);
+            }
+            catch (e) {
+                console.error("[TaloService] updatePlayer failed", e);
+            }
+        });
+    }
+    static reportScore(sessionId_1, score_1, kills_1, wins_1, playerIdentifier_1) {
+        return __awaiter(this, arguments, void 0, function* (sessionId, score, kills, wins, playerIdentifier, mode = "coop") {
+            try {
+                if (this.blockedReason)
+                    return;
+                console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}, Mode=${mode}`);
                 // 1. Send Game End Event
-                yield this.addEvent("game_end", { kills, win: wins > 0 }, playerIdentifier);
+                yield this.addEvent("game_end", { kills, win: wins > 0, mode }, playerIdentifier);
                 // 2. Update Leaderboards
-                // For TotalStats, we need to fetch the current value first, then add to it.
-                // Or use Talo Stats if available, but here we use Leaderboards as storage.
+                const killsBoard = mode === "single" ? "TotalKillsSingle" : "TotalKillsCoop";
+                const winsBoard = mode === "single" ? "TotalWinsSingle" : "TotalWinsCoop";
                 // Update Total Kills
-                yield this.incrementLeaderboardScore("TotalKillsCoop", kills, playerIdentifier);
+                yield this.incrementLeaderboardScore(killsBoard, kills, playerIdentifier);
                 // Update Total Wins
                 if (wins > 0) {
-                    yield this.incrementLeaderboardScore("TotalWinsCoop", wins, playerIdentifier);
+                    yield this.incrementLeaderboardScore(winsBoard, wins, playerIdentifier);
                 }
                 // HighScore (Max)
-                // For HighScore, we usually want to submit the *current game score*. 
-                // Talo leaderboards are typically "High Score" (keep best) by default.
                 yield this.submitToLeaderboard("HighScore", score, playerIdentifier);
             }
             catch (e) {

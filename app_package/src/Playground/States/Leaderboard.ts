@@ -57,39 +57,40 @@ export class Leaderboard extends State {
       const entries = data && Array.isArray(data.entries) ? data.entries : [];
       if (entries.length > 0) {
         entries.forEach((entry: any) => {
-          const row = new StackPanel();
-          row.isVertical = false;
+          const row = new Grid();
           row.height = "30px";
           row.width = "100%";
+          row.addColumnDefinition(0.15, false); // Rank
+          row.addColumnDefinition(0.60, false); // Name
+          row.addColumnDefinition(0.25, false); // Score
 
           const rank = new TextBlock("rank", "#" + (Number(entry.position) + 1));
-          rank.width = "15%";
           rank.color = "white";
           rank.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
           GuiFramework.setFont(rank, true, false);
-          row.addControl(rank);
+          row.addControl(rank, 0, 0);
 
           const nRaw = entry?.member?.username || entry?.playerAlias || "Unknown";
           let n = String(nRaw);
-          if (typeof nRaw === 'object') {
+          if (entry?.member?.props?.name) {
+              n = entry.member.props.name;
+          } else if (typeof nRaw === 'object') {
               if (nRaw.username) n = nRaw.username;
               else if (nRaw.identifier) n = nRaw.identifier;
               else if (nRaw.id) n = `Player ${nRaw.id}`;
               else n = "Unknown";
           }
           const name = new TextBlock("name", n);
-          name.width = "60%";
           name.color = "white";
           name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
           GuiFramework.setFont(name, true, false);
-          row.addControl(name);
+          row.addControl(name, 0, 1);
 
           const score = new TextBlock("score", String(entry?.score ?? 0));
-          score.width = "25%";
           score.color = "#a6fffa";
           score.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
           GuiFramework.setFont(score, true, true);
-          row.addControl(score);
+          row.addControl(score, 0, 2);
 
           entriesPanel.addControl(row);
         });
@@ -175,18 +176,14 @@ export class Leaderboard extends State {
       statsPanel.addControl(winsValue)
 
       // --- Right: Global Leaderboard List (Single List - Default to CO-OP) ---
-      const rightPanel = new StackPanel();
-      rightPanel.isVertical = true;
-      rightPanel.width = "100%";
-      rightPanel.height = "100%"; 
-      mainSplit.addControl(rightPanel, 0, 1);
-
+      // Removed redundant StackPanel wrapper that caused height issues
+      
       // Content Grid (1 Row, 2 Cols for Kills | Wins)
       const leaderboardsGrid = new Grid();
       leaderboardsGrid.addColumnDefinition(0.5, false);
       leaderboardsGrid.addColumnDefinition(0.5, false);
       leaderboardsGrid.height = "100%"; // Fill rest
-      rightPanel.addControl(leaderboardsGrid);
+      mainSplit.addControl(leaderboardsGrid, 0, 1);
 
       // Helper to create leaderboard section
       const createLbSection = (title: string, internalName: string, columnIndex: number) => {
@@ -248,7 +245,9 @@ export class Leaderboard extends State {
 
                           const nRaw = entry?.member?.username || entry?.playerAlias || "Unknown";
                           let n = String(nRaw);
-                          if (typeof nRaw === 'object') {
+                          if (entry?.member?.props?.name) {
+                              n = entry.member.props.name;
+                          } else if (typeof nRaw === 'object') {
                               if (nRaw.username) n = nRaw.username;
                               else if (nRaw.identifier) n = nRaw.identifier;
                               else if (nRaw.id) n = `Player ${nRaw.id}`;
@@ -293,9 +292,8 @@ export class Leaderboard extends State {
           listPanel.addControl(spacer);
       };
 
-      // Always render COOP mode
-      createLbSection("Top Kills", "TotalKillsCoop", 0);
-      createLbSection("Top Wins", "TotalWinsCoop", 1);
+      createLbSection("Top Kills", Leaderboard.leaderboardConfig.killsAlias, 0);
+      createLbSection("Top Wins", Leaderboard.leaderboardConfig.winsAlias, 1);
 
       // Load Data
       const _this = this

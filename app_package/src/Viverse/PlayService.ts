@@ -69,6 +69,16 @@ export class PlayService {
   async setActor(actor: Actor): Promise<{ success: boolean; message?: string }> {
     this.actor = actor
     console.log("[Play] setActor", actor)
+    
+    const identity =
+      (this.actor?.userId && String(this.actor.userId)) ||
+      (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
+      (this.actor?.session_id ? String(this.actor.session_id) : "");
+    
+    if (identity) {
+      TaloClient.identify(identity);
+    }
+
     this.emit("actorJoined", actor)
     return { success: true }
   }
@@ -372,7 +382,7 @@ export class PlayService {
     return TaloClient.getPlayerStats();
   }
 
-  async reportGameResult(kills: number, win: boolean) {
+  async reportGameResult(kills: number, win: boolean, score: number = 0) {
       const identity =
         (this.actor?.userId && String(this.actor.userId)) ||
         (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
@@ -381,7 +391,7 @@ export class PlayService {
       if (identity) {
         TaloClient.identify(identity);
       }
-      return TaloClient.addEvent("game_end", { kills, win });
+      return TaloClient.addEvent("game_end", { kills, win, score });
   }
 
   notifyEnemyKill(payload: number | { enemyIndex: number; killerIndex?: number }) {

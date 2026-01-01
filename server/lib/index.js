@@ -149,15 +149,9 @@ app.post("/api/events", (req, res) => __awaiter(void 0, void 0, void 0, function
             const kills = Number(props.kills) || 0;
             const win = !!props.win;
             const score = Number(props.score) || 0;
-            if (kills > 0) {
-                yield TaloService_1.TaloService.incrementLeaderboardScore("TotalKillsSingle", kills, identity);
-            }
-            if (win) {
-                yield TaloService_1.TaloService.incrementLeaderboardScore("TotalWinsSingle", 1, identity);
-            }
-            if (score > 0) {
-                yield TaloService_1.TaloService.submitToLeaderboard("HighScore", score, identity);
-            }
+            // Default to "single" mode for API-based reports (PlayService.ts uses this for Single Player)
+            const mode = (props.mode === "coop") ? "coop" : "single";
+            yield TaloService_1.TaloService.reportScore("API", score, kills, win ? 1 : 0, identity, mode);
         }
         res.json({ success: true });
     }
@@ -281,4 +275,10 @@ app.get("/me", (req, res) => {
 });
 gameServer.listen(port);
 console.log(`Listening on ws://localhost:${port}`);
+if (process.env.TALO_ACCESS_KEY) {
+    console.log(`[Talo] TALO_ACCESS_KEY is set (starts with ${process.env.TALO_ACCESS_KEY.substring(0, 4)}...)`);
+}
+else {
+    console.warn("[Talo] TALO_ACCESS_KEY is NOT set. Leaderboards will be disabled.");
+}
 //# sourceMappingURL=index.js.map

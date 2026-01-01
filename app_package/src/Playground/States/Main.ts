@@ -192,7 +192,16 @@ export class Main extends State {
             Main.playButton = GuiFramework.addButton("SINGLE", panel);
             Main.playButton.isVisible = Assets.loadingComplete;
 
-            Main.playButton.onPointerDownObservable.add(function (info) {
+            Main.playButton.onPointerDownObservable.add(async function (info) {
+                if (!playService.getActor()) {
+                    console.log("[Main] Play clicked but no actor set. Setting Guest.");
+                    const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                    await playService.setActor({
+                        session_id: guestId,
+                        name: guestId,
+                        properties: {}
+                    });
+                }
                 const gameDefinition = new GameDefinition();
                 // If split-screen is allowed, default to 2P (keyboard+gamepad supported)
                 gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
@@ -403,7 +412,16 @@ export class Main extends State {
         // Single Play
             Main.playButton = GuiFramework.addButton("Single", this._panel);
             Main.playButton.isVisible = Assets.loadingComplete;
-            Main.playButton.onPointerDownObservable.add(() => {
+            Main.playButton.onPointerDownObservable.add(async () => {
+                 if (!playService.getActor()) {
+                     console.log("[Main] Play clicked but no actor set. Setting Guest.");
+                     const guestId = "Guest_" + Math.floor(Math.random() * 100000);
+                     await playService.setActor({
+                         session_id: guestId,
+                         name: guestId,
+                         properties: {}
+                     });
+                 }
                  const gameDefinition = new GameDefinition();
                  gameDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
                  gameDefinition.aiEnemies = Parameters.enemyCount;

@@ -376,6 +376,11 @@ export class GameRoom extends Room<GameState> {
 
         this.state.players.set(client.sessionId, player);
         
+        // Sync name to Talo
+        if (player.name && player.name !== "Player") {
+            TaloService.updatePlayer(player.userId, player.name);
+        }
+
         // Update metadata with player count and icons
         this.updatePlayerMetadata();
     }

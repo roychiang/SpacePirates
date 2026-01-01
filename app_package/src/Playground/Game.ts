@@ -734,8 +734,9 @@ export class Game {
                         
                         const myShip = this.humanPlayerShips[this._localPlayerIndex];
                         const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                        const score = kills * 100;
                         if (!playService.colyseusRoom) {
-                            playService.reportGameResult(kills, false);
+                            playService.reportGameResult(kills, false, score);
                         }
 
                         States.dead.ship = myShip;
@@ -757,8 +758,9 @@ export class Game {
 
                         const myShip = this.humanPlayerShips[this._localPlayerIndex];
                         const kills = myShip.statistics ? myShip.statistics.shipsDestroyed : 0;
+                        const score = kills * 100;
                         if (!playService.colyseusRoom) {
-                            playService.reportGameResult(kills, true);
+                            playService.reportGameResult(kills, true, score);
                         }
 
                         if (this._HUD) {
