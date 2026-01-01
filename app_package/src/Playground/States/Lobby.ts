@@ -57,8 +57,8 @@ export class Lobby extends State {
     GuiFramework.setFont(this.countdownText, true, true);
     panel.addControl(this.countdownText);
 
-    const leaveBtn = GuiFramework.addButton("Leave Room", panel)
     this.startBtn = GuiFramework.addButton("Start Game", panel)
+    const leaveBtn = GuiFramework.addButton("Leave Room", panel)
     this.startBtn.isVisible = false // Initially hidden, shown only for host when room is full
     leaveBtn.onPointerDownObservable.add(() => {
       playService.leaveRoom().then(() => {
