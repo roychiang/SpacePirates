@@ -107,7 +107,7 @@ __decorate([
 class GameRoom extends colyseus_1.Room {
     constructor() {
         super(...arguments);
-        this.maxClients = 32; // Keep high to prevent auto-lock; use customMaxPlayers for logic
+        this.maxClients = 32;
         this.customMaxPlayers = 4;
         this.playerKills = new Map();
         this.killedEnemies = new Set();
@@ -116,7 +116,6 @@ class GameRoom extends colyseus_1.Room {
     }
     onCreate(options) {
         this.setState(new GameState());
-        console.log("GameRoom created with options:", options);
         // Store maxPlayers but keep maxClients high to prevent auto-lock hiding room
         if (options.maxPlayers) {
             this.customMaxPlayers = options.maxPlayers;
@@ -127,11 +126,10 @@ class GameRoom extends colyseus_1.Room {
         // Set room metadata for listing (includes game_mode for PVP/Co-op filtering)
         const metadata = {
             name: options.name || "Game Room",
-            game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop",
-            max_players: this.customMaxPlayers
+            max_players: this.customMaxPlayers,
+            game_mode: options.game_mode || (options.properties && options.properties.game_mode) || "coop"
         };
         if (options.properties) {
-            console.log("Initializing room properties:", options.properties);
             Object.assign(metadata, options.properties);
             for (const key in options.properties) {
                 this.state.properties.set(key, String(options.properties[key]));
@@ -143,10 +141,8 @@ class GameRoom extends colyseus_1.Room {
                     // Count enemies (assuming type 1 is enemy)
                     const enemies = aiConfig.filter((c) => c.type === 1).length;
                     this.state.totalEnemies = enemies;
-                    console.log(`[GameRoom] Set totalEnemies to ${enemies} based on ai_config`);
                 }
                 catch (e) {
-                    console.error("[GameRoom] Failed to parse ai_config for enemy count", e);
                 }
             }
         }
@@ -155,7 +151,6 @@ class GameRoom extends colyseus_1.Room {
             const fallback = Number(options.aiEnemies || (options.properties && options.properties.aiEnemies) || 10);
             if (fallback > 0) {
                 this.state.totalEnemies = fallback;
-                console.log(`[GameRoom] Set totalEnemies to ${fallback} based on fallback options`);
             }
         }
         // Ensure game_mode is explicitly set in metadata if found in options
@@ -164,7 +159,6 @@ class GameRoom extends colyseus_1.Room {
             this.state.properties.set("game_mode", options.game_mode);
         }
         this.setMetadata(metadata);
-        console.log("Room metadata set:", metadata);
         const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
         const finite = (v) => typeof v === "number" && Number.isFinite(v);
         const getJoinOrder = (client) => {
@@ -253,15 +247,15 @@ class GameRoom extends colyseus_1.Room {
             if (joinOrder < 0)
                 return;
             const raw = message || {};
-            const hostJoinOrder = getHostJoinOrder();
-            const isHost = hostJoinOrder >= 0 && joinOrder === hostJoinOrder;
+            // Allow any player to report kills for now (Client Authoritative for their own kills)
+            // Ideally, we should validate damage history, but for Co-op, we trust the client to report "I killed X".
             const enemyIndex = finite(raw.enemyIndex) ? raw.enemyIndex : raw.index;
             if (!finite(enemyIndex) || !Number.isInteger(enemyIndex) || enemyIndex < 0 || enemyIndex >= 2048)
                 return;
             if (this.killedEnemies.has(enemyIndex))
                 return;
             this.killedEnemies.add(enemyIndex);
-            const killerIndex = isHost && finite(raw.killerIndex) ? raw.killerIndex : joinOrder;
+            const killerIndex = finite(raw.killerIndex) ? raw.killerIndex : joinOrder;
             if (!finite(killerIndex) || !Number.isInteger(killerIndex) || killerIndex < 0 || killerIndex >= this.customMaxPlayers)
                 return;
             let killerSessionId = null;
@@ -368,7 +362,6 @@ class GameRoom extends colyseus_1.Room {
         });
         // Handle room properties update
         this.onMessage("updateRoomProperties", (client, message) => {
-            console.log("Updating room properties:", message);
             const newMetadata = Object.assign({}, this.metadata);
             for (const key in message) {
                 const val = message[key];
@@ -393,14 +386,12 @@ class GameRoom extends colyseus_1.Room {
                     }
                 }
                 catch (e) {
-                    console.error("[GameRoom] Failed to parse ai_config for enemy count", e);
                 }
             }
             try {
                 this.setMetadata(newMetadata);
             }
             catch (e) {
-                console.error("[GameRoom] Failed to set metadata:", e);
             }
         });
     }
@@ -417,7 +408,6 @@ class GameRoom extends colyseus_1.Room {
         if (this.state.players.size >= this.customMaxPlayers) {
             throw new Error("Room is full");
         }
-        console.log(client.sessionId, "joined!");
         const player = new Player();
         player.sessionId = client.sessionId;
         // Fix: Use persistent ID from client options if available, otherwise fallback to session ID
@@ -435,16 +425,13 @@ class GameRoom extends colyseus_1.Room {
         }
         this.assignedJoinOrders.add(assignedOrder);
         player.joinOrder = assignedOrder;
-        console.log(`[GameRoom] Assigned joinOrder ${assignedOrder} to ${player.name} (${client.sessionId})`);
         this.state.players.set(client.sessionId, player);
         // Update metadata with player count and icons
         this.updatePlayerMetadata();
     }
     onLeave(client, consented) {
-        console.log(client.sessionId, "left!");
         const player = this.state.players.get(client.sessionId);
         if (player) {
-            console.log(`[GameRoom] Releasing joinOrder ${player.joinOrder} for ${player.name}`);
             this.assignedJoinOrders.delete(player.joinOrder);
             this.lastPositions.delete(client.sessionId);
             // Broadcast playerDied to ensure clients mark the ship as dead immediately
@@ -455,7 +442,6 @@ class GameRoom extends colyseus_1.Room {
         this.updatePlayerMetadata();
     }
     onDispose() {
-        console.log("room", this.roomId, "disposing...");
     }
 }
 exports.GameRoom = GameRoom;

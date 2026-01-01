@@ -1,8 +1,10 @@
+declare var process: { env: { [key: string]: string | undefined } };
+
 export class Config {
     public static readonly PROD_ENDPOINT = "wss://spacepirates.duckdns.org/colyseus";
     public static readonly LOCAL_ENDPOINT = "ws://localhost:2567";
     public static readonly PEERJS_PATH = "/peerjs";
-    public static readonly VIVERSE_CLIENT_ID = "4p4wmv9d5z"; // TODO: Move to environment variable for production
+    public static readonly VIVERSE_CLIENT_ID = process.env.VIVERSE_CLIENT_ID || "4p4wmv9d5z"; // Fallback to dev ID if not set
 
     public static getColyseusEndpoint(): string {
         try {

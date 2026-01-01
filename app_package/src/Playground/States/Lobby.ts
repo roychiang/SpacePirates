@@ -111,7 +111,7 @@ export class Lobby extends State {
       playersText.height = "30px"
       playersText.textWrapping = false
       playersText.topInPixels = 26
-      avatarGrid.addControl(playersText, 1, 1)
+      avatarGrid.addControl(playersText)
     }
     
     // Initial update
@@ -158,7 +158,7 @@ export class Lobby extends State {
         const currentRoomCount = (currentRoom && currentRoom.actors) ? currentRoom.actors.length : 0;
         const displayTotal = Math.max(total, currentRoomCount);
 
-        const t = avatarGrid.children.find(c => c.name === "globalPlayersOnline") as TextBlock
+        const t = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline") as TextBlock
         if (t) {
             t.text = ""
             t.text = `Players Online: ${displayTotal}`
