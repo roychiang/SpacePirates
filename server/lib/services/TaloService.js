@@ -106,11 +106,15 @@ class TaloService {
         });
     }
     static reportScore(sessionId_1, score_1, kills_1, wins_1, playerIdentifier_1) {
-        return __awaiter(this, arguments, void 0, function* (sessionId, score, kills, wins, playerIdentifier, mode = "coop") {
+        return __awaiter(this, arguments, void 0, function* (sessionId, score, kills, wins, playerIdentifier, mode = "coop", playerName) {
             try {
                 if (this.blockedReason)
                     return;
-                console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}, Mode=${mode}`);
+                console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}, Mode=${mode}, Name=${playerName}`);
+                // 0. Update Player Name if provided
+                if (playerName) {
+                    yield this.updatePlayer(playerIdentifier, playerName);
+                }
                 // 1. Send Game End Event
                 yield this.addEvent("game_end", { kills, win: wins > 0, mode }, playerIdentifier);
                 // 2. Update Leaderboards
@@ -176,6 +180,7 @@ class TaloService {
                 }
                 const url = new URL(`${this.baseUrl}/leaderboards/${alias}/entries`);
                 url.searchParams.set("page", "0");
+                url.searchParams.set("expand", "playerAlias.player");
                 if (identifier) {
                     const aliasId = yield this.identifyAliasId(identifier);
                     url.searchParams.set("aliasId", String(aliasId));

@@ -36,6 +36,7 @@ export class PlayService {
   private room?: Room
   private listeners: Record<string, Handler[]> = {}
   private connected: boolean = false
+  private _guestIdentity: string = "";
 
   private client?: Colyseus.Client
   public colyseusRoom?: Colyseus.Room
@@ -126,19 +127,29 @@ export class PlayService {
     if (!this.client) return { success: false, message: "No client" }
 
     try {
-      const userId =
-        (this.actor?.userId && String(this.actor.userId)) ||
-        (this.actor?.session_id && String(this.actor.session_id)) ||
-        "";
+      const userId = this.getIdentity();
+      
+      let displayName = this.actor?.name ? String(this.actor.name) : "";
+      if (!displayName) {
+          if (userId.startsWith("Guest_")) {
+              displayName = userId;
+          } else {
+              if (!this._guestIdentity) {
+                   this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
+              }
+              displayName = this._guestIdentity;
+          }
+      }
+
       const options = {
         name: cfg.name,
         maxClients: cfg.maxPlayers,
         properties: cfg.properties, // Pass properties to server
         game_mode: cfg.properties?.game_mode, // Lift game_mode to top level for reliability
         userId,
-        displayName: this.actor?.name ? String(this.actor.name) : undefined,
+        displayName: displayName,
         headIconUrl: this.actor?.properties?.headIconUrl ? String(this.actor.properties.headIconUrl) : undefined,
-        playerName: this.actor?.name ? String(this.actor.name) : undefined
+        playerName: displayName
       };
 
       console.log("[Play] creating room...", JSON.stringify(options));
@@ -211,15 +222,25 @@ export class PlayService {
     if (!this.client) return { success: false, message: "No client" }
 
     try {
-      const userId =
-        (this.actor?.userId && String(this.actor.userId)) ||
-        (this.actor?.session_id && String(this.actor.session_id)) ||
-        "";
+      const userId = this.getIdentity();
+
+      let displayName = this.actor?.name ? String(this.actor.name) : "";
+      if (!displayName) {
+          if (userId.startsWith("Guest_")) {
+              displayName = userId;
+          } else {
+              if (!this._guestIdentity) {
+                   this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
+              }
+              displayName = this._guestIdentity;
+          }
+      }
+
       const options = {
         userId,
-        displayName: this.actor?.name ? String(this.actor.name) : undefined,
+        displayName: displayName,
         headIconUrl: this.actor?.properties?.headIconUrl ? String(this.actor.properties.headIconUrl) : undefined,
-        playerName: this.actor?.name ? String(this.actor.name) : undefined
+        playerName: displayName
       };
 
       console.log("[Play] joining room...", roomId, options);
@@ -370,28 +391,39 @@ export class PlayService {
     // No-op for Colyseus, handled by join
   }
 
-  async getPlayerStats(): Promise<{ kills: number; wins: number }> {
-    const identity =
+  private getIdentity(): string {
+    let identity =
       (this.actor?.userId && String(this.actor.userId)) ||
       (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
       (this.actor?.session_id ? String(this.actor.session_id) : "") ||
       (this.colyseusRoom?.sessionId ? String(this.colyseusRoom.sessionId) : "");
+    
+    if (!identity) {
+        if (!this._guestIdentity) {
+            this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
+        }
+        identity = this._guestIdentity;
+    }
+    return identity;
+  }
+
+  async getPlayerStats(mode?: "single" | "coop"): Promise<{ kills: number; wins: number }> {
+    const identity = this.getIdentity();
     if (identity) {
       TaloClient.identify(identity);
     }
-    return TaloClient.getPlayerStats();
+    return TaloClient.getPlayerStats(mode);
   }
 
   async reportGameResult(kills: number, win: boolean, score: number = 0) {
-      const identity =
-        (this.actor?.userId && String(this.actor.userId)) ||
-        (this.actor?.properties && (this.actor.properties as any).userId ? String((this.actor.properties as any).userId) : "") ||
-        (this.actor?.session_id ? String(this.actor.session_id) : "") ||
-        (this.colyseusRoom?.sessionId ? String(this.colyseusRoom.sessionId) : "");
+      const identity = this.getIdentity();
+      
+      let playerName = this.actor?.name || (this.actor?.properties as any)?.displayName || "";
+      
       if (identity) {
         TaloClient.identify(identity);
       }
-      return TaloClient.addEvent("game_end", { kills, win, score });
+      return TaloClient.addEvent("game_end", { kills, win, score, playerName });
   }
 
   notifyEnemyKill(payload: number | { enemyIndex: number; killerIndex?: number }) {

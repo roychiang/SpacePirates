@@ -343,7 +343,8 @@ class GameRoom extends colyseus_1.Room {
                     win = p.joinOrder === winnerFaction;
                 }
                 const identifier = (p.userId && typeof p.userId === "string" && p.userId.length > 0) ? p.userId : sessionId;
-                TaloService_1.TaloService.reportScore(sessionId, this.state.score, kills, win ? 1 : 0, identifier);
+                const playerName = p.displayName || p.name || "Player";
+                TaloService_1.TaloService.reportScore(sessionId, this.state.score, kills, win ? 1 : 0, identifier, "coop", playerName);
             });
             this.broadcast("gameEnd", message);
         });

@@ -74,6 +74,8 @@ export class Leaderboard extends State {
           let n = String(nRaw);
           if (entry?.member?.props?.name) {
               n = entry.member.props.name;
+          } else if (entry?.playerAlias?.player?.props?.name) {
+              n = entry.playerAlias.player.props.name;
           } else if (typeof nRaw === 'object') {
               if (nRaw.username) n = nRaw.username;
               else if (nRaw.identifier) n = nRaw.identifier;
@@ -247,6 +249,8 @@ export class Leaderboard extends State {
                           let n = String(nRaw);
                           if (entry?.member?.props?.name) {
                               n = entry.member.props.name;
+                          } else if (entry?.playerAlias?.player?.props?.name) {
+                              n = entry.playerAlias.player.props.name;
                           } else if (typeof nRaw === 'object') {
                               if (nRaw.username) n = nRaw.username;
                               else if (nRaw.identifier) n = nRaw.identifier;
@@ -304,7 +308,9 @@ export class Leaderboard extends State {
       this._adt.addControl(grid)
 
       const refreshStats = () => {
-        playService.getPlayerStats().then(s => {
+        const mode = Leaderboard.leaderboardConfig.killsAlias.includes("Single") ? "single" : 
+                     Leaderboard.leaderboardConfig.killsAlias.includes("Coop") ? "coop" : undefined;
+        playService.getPlayerStats(mode as any).then(s => {
           if (!this._isActive) return;
           killsValue.text = String(s.kills || 0)
           winsValue.text = String(s.wins || 0)
@@ -392,7 +398,9 @@ export class Leaderboard extends State {
       this._adt.addControl(grid)
 
       const refreshStats = () => {
-        playService.getPlayerStats().then(s => {
+        const mode = Leaderboard.leaderboardConfig.killsAlias.includes("Single") ? "single" : 
+                     Leaderboard.leaderboardConfig.killsAlias.includes("Coop") ? "coop" : undefined;
+        playService.getPlayerStats(mode as any).then(s => {
           if (!this._isActive) return;
           killsValue.text = String(s.kills || 0)
           winsValue.text = String(s.wins || 0)

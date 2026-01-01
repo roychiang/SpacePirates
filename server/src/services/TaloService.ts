@@ -100,10 +100,16 @@ export class TaloService {
         }
     }
 
-    static async reportScore(sessionId: string, score: number, kills: number, wins: number, playerIdentifier: string, mode: "single" | "coop" = "coop") {
+    static async reportScore(sessionId: string, score: number, kills: number, wins: number, playerIdentifier: string, mode: "single" | "coop" = "coop", playerName?: string) {
         try {
             if (this.blockedReason) return;
-            console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}, Mode=${mode}`);
+            console.log(`[TaloService] Reporting score for ${sessionId} (ID: ${playerIdentifier}): Score=${score}, Kills=${kills}, Wins=${wins}, Mode=${mode}, Name=${playerName}`);
+            
+            // 0. Update Player Name if provided
+            if (playerName) {
+                await this.updatePlayer(playerIdentifier, playerName);
+            }
+
             // 1. Send Game End Event
             await this.addEvent("game_end", { kills, win: wins > 0, mode }, playerIdentifier);
             
@@ -167,6 +173,7 @@ export class TaloService {
             }
             const url = new URL(`${this.baseUrl}/leaderboards/${alias}/entries`);
             url.searchParams.set("page", "0");
+            url.searchParams.set("expand", "playerAlias.player");
             if (identifier) {
                 const aliasId = await this.identifyAliasId(identifier);
                 url.searchParams.set("aliasId", String(aliasId));

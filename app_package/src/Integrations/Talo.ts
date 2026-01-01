@@ -22,8 +22,8 @@ export class TaloClient {
         // No-op
     }
 
-    public static async getLeaderboard(alias: string): Promise<any> {
-        console.log(`[Talo] getLeaderboard: Requesting leaderboard "${alias}" via Proxy`);
+    public static async getLeaderboard(alias: string, identifier?: string): Promise<any> {
+        console.log(`[Talo] getLeaderboard: Requesting leaderboard "${alias}" via Proxy` + (identifier ? ` for ${identifier}` : ""));
         try {
             // Use Server Proxy
             let endpoint = Config.getColyseusEndpoint().replace("wss://", "https://").replace("ws://", "http://");
@@ -33,7 +33,7 @@ export class TaloClient {
                  endpoint = window.location.origin; // e.g. http://localhost:8080
             }
             
-            const url = `${endpoint}/api/leaderboard/${alias}`;
+            const url = `${endpoint}/api/leaderboard/${alias}` + (identifier ? `?identifier=${encodeURIComponent(identifier)}` : "");
             
             console.log(`[Talo] Fetching ${url}`);
             const entriesRes = await fetch(url);
@@ -57,30 +57,45 @@ export class TaloClient {
         console.warn("[Talo] updateLeaderboard called on client. This is now handled by the Server securely.");
     }
 
-    public static async getPlayerStats(): Promise<{ kills: number, wins: number }> {
-        console.log("[Talo] getPlayerStats: Requesting player stats from Leaderboards...");
+    public static async getPlayerStats(mode?: "single" | "coop"): Promise<{ kills: number, wins: number }> {
+        console.log(`[Talo] getPlayerStats: Requesting player stats from Leaderboards (Mode: ${mode || "All"})...`);
         if (this._identity) await this.syncPlayer();
         
         try {
-            const killsSingle = await this.getLeaderboard("TotalKillsSingle");
-            const killsCoop = await this.getLeaderboard("TotalKillsCoop");
-            const winsSingle = await this.getLeaderboard("TotalWinsSingle");
-            const winsCoop = await this.getLeaderboard("TotalWinsCoop");
-            
-            const findScore = (lb: any) => {
-                 if (!lb || !lb.entries) return 0;
-                 // Match by identifier (if available) or alias if mapped
-                 // Talo entries usually have 'playerAlias' object or 'playerIdentifier' string
-                 const entry = lb.entries.find((e: any) => 
-                    e.playerIdentifier === this._identity || 
-                    (e.playerAlias && e.playerAlias.identifier === this._identity)
-                 );
-                 return entry ? parseFloat(entry.score) : 0;
+            // Helper to get score for a specific board and current identity
+            const getScore = async (alias: string) => {
+                // If no identity is set, do not fetch leaderboard or return 0 immediately
+                if (!this._identity) return 0;
+                
+                const data = await this.getLeaderboard(alias, this._identity);
+                if (data && data.entries && data.entries.length > 0) {
+                     // Talo returns array with the user's entry if found
+                     // If multiple (unlikely with aliasId), find matching
+                     const entry = data.entries.find((e: any) => 
+                        e.playerIdentifier === this._identity || 
+                        (e.playerAlias && e.playerAlias.identifier === this._identity)
+                     );
+                     
+                     // Only return score if we actually found the user
+                     return entry ? parseFloat(entry.score) || 0 : 0;
+                }
+                return 0;
             };
 
-            const k = findScore(killsSingle) + findScore(killsCoop);
-            const w = findScore(winsSingle) + findScore(winsCoop);
-            console.log(`[Talo] Player Stats Found: Kills=${k} (S:${findScore(killsSingle)}+C:${findScore(killsCoop)}), Wins=${w}`);
+            let k = 0;
+            let w = 0;
+
+            if (mode === "single" || !mode) {
+                 k += await getScore("TotalKillsSingle");
+                 w += await getScore("TotalWinsSingle");
+            }
+            
+            if (mode === "coop" || !mode) {
+                 k += await getScore("TotalKillsCoop");
+                 w += await getScore("TotalWinsCoop");
+            }
+
+            console.log(`[Talo] Player Stats Found: Kills=${k}, Wins=${w}`);
             return { kills: k, wins: w };
         } catch (e) {
             console.error("[Talo] Failed to fetch player stats from leaderboards", e);

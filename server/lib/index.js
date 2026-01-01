@@ -151,7 +151,8 @@ app.post("/api/events", (req, res) => __awaiter(void 0, void 0, void 0, function
             const score = Number(props.score) || 0;
             // Default to "single" mode for API-based reports (PlayService.ts uses this for Single Player)
             const mode = (props.mode === "coop") ? "coop" : "single";
-            yield TaloService_1.TaloService.reportScore("API", score, kills, win ? 1 : 0, identity, mode);
+            const playerName = props.playerName;
+            yield TaloService_1.TaloService.reportScore("API", score, kills, win ? 1 : 0, identity, mode, playerName);
         }
         res.json({ success: true });
     }
