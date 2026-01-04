@@ -28,12 +28,14 @@ export class Main extends State {
     private _chatScroll?: ScrollViewer;
     private _chatOverlay?: { show: () => void, hide: () => void, toggle: () => void, dispose: () => void, el: HTMLInputElement };
     private _emojiPanel?: Control;
-    private _mentionPanel?: Control;
-    private _mentionListStack?: StackPanel;
+    // private _mentionPanel?: Control; // Removed
+    // private _mentionListStack?: StackPanel; // Removed
+    private _onlineListStack?: StackPanel; // New: Online List
+    private _onlineCountText?: TextBlock; // New: Online Count Header
     private _chatOrb?: Button;
-    private _notificationBadge?: Control; // New: Notification Badge
+    private _notificationBadge?: Control; 
     private _keyboardHandler?: (e: KeyboardEvent) => void;
-    private _inputBtnRef?: Button; // Keep ref to update text
+    private _inputBtnRef?: Button; 
 
     private onChatReceived = (msg: { senderId: string, name: string, text: string }) => {
         if (!this._chatContent) return;
@@ -89,6 +91,11 @@ export class Main extends State {
     private createChatUI() {
         if (!this._adt) return;
         if (this._chatRoot) return;
+
+        // Subscribe to global lobby updates for the list
+        playService.on("globalLobbyUpdated", (players: any[]) => {
+            this.updateOnlineList(players);
+        });
 
         // Input Placeholder Button (Ref needed early for sync)
         const inputBtn = Button.CreateSimpleButton("inputBtn", "Tap to chat...");
@@ -166,6 +173,11 @@ export class Main extends State {
                         if (this._chatScroll) this._chatScroll.verticalBar.value = 1;
                         if (this._notificationBadge) this._notificationBadge.isVisible = false;
                         
+                        // Update list immediately if data exists
+                        if (playService.globalLobbyState && playService.globalLobbyState.players) {
+                            this.updateOnlineList(playService.globalLobbyState.players);
+                        }
+
                         // Show Input Overlay
                         if (this._chatOverlay) {
                              this._chatOverlay.el.style.display = "block";
@@ -226,7 +238,7 @@ export class Main extends State {
 
         const mainGrid = new Grid();
         mainGrid.addRowDefinition(60, true);   // Header (Title + Close)
-        mainGrid.addRowDefinition(1.0, false); // Chat history
+        mainGrid.addRowDefinition(1.0, false); // Content Area (Chat + List)
         mainGrid.addRowDefinition(80, true);   // Input area
         container.addControl(mainGrid);
 
@@ -256,7 +268,13 @@ export class Main extends State {
         });
         headerGrid.addControl(closeBtn, 0, 1);
 
-        // History
+        // Content Area (Split Chat History and Online List)
+        const contentGrid = new Grid();
+        contentGrid.addColumnDefinition(0.75, false); // Chat History
+        contentGrid.addColumnDefinition(0.25, false); // Online List
+        mainGrid.addControl(contentGrid, 1, 0);
+
+        // History (Column 0)
         const scroller = new ScrollViewer();
         scroller.width = "100%";
         scroller.height = "100%";
@@ -264,7 +282,7 @@ export class Main extends State {
         scroller.barSize = 10;
         scroller.barColor = "#a6fffa";
         scroller.background = "transparent";
-        mainGrid.addControl(scroller, 1, 0);
+        contentGrid.addControl(scroller, 0, 0);
         this._chatScroll = scroller;
 
         const stack = new StackPanel();
@@ -274,6 +292,33 @@ export class Main extends State {
         scroller.addControl(stack);
         this._chatContent = stack;
         
+        // Online List Panel (Column 1)
+        const onlineGrid = new Grid();
+        onlineGrid.addRowDefinition(40, true); // "Online (N)" Header
+        onlineGrid.addRowDefinition(1.0, false); // List
+        onlineGrid.background = "#051116aa"; // Slightly darker background
+        contentGrid.addControl(onlineGrid, 0, 1);
+
+        const onlineHeader = new TextBlock("onlineHeader", "Online (0)");
+        onlineHeader.color = "#a6fffa";
+        onlineHeader.fontSize = 18;
+        onlineHeader.fontWeight = "bold";
+        onlineGrid.addControl(onlineHeader, 0, 0);
+        this._onlineCountText = onlineHeader;
+
+        const onlineScroller = new ScrollViewer();
+        onlineScroller.width = "100%";
+        onlineScroller.height = "100%";
+        onlineScroller.thickness = 0;
+        onlineScroller.barSize = 5;
+        onlineScroller.barColor = "#a6fffa";
+        onlineGrid.addControl(onlineScroller, 1, 0);
+
+        const onlineStack = new StackPanel();
+        onlineStack.width = "100%";
+        onlineScroller.addControl(onlineStack);
+        this._onlineListStack = onlineStack;
+
         // Add welcome message
         this.onChatReceived({ senderId: "", name: "System", text: "Welcome to Global Chat!" });
 
@@ -282,7 +327,7 @@ export class Main extends State {
         inputGrid.height = "60px";
         inputGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP; // Align top of this row
         inputGrid.addColumnDefinition(50, true); // Emoji btn
-        inputGrid.addColumnDefinition(50, true); // Mention btn
+        // inputGrid.addColumnDefinition(50, true); // Mention btn (REMOVED)
         inputGrid.addColumnDefinition(1.0, false); // Input Spacer for HTML Overlay
         inputGrid.addColumnDefinition(80, true); // Send btn
         mainGrid.addControl(inputGrid, 2, 0);
@@ -296,44 +341,20 @@ export class Main extends State {
         emojiBtn.onPointerUpObservable.add(() => {
             if (this._emojiPanel) {
                 this._emojiPanel.isVisible = !this._emojiPanel.isVisible;
-                if (this._mentionPanel) this._mentionPanel.isVisible = false;
             }
         });
         inputGrid.addControl(emojiBtn, 0, 0);
 
-        // Mention Button
-        const mentionBtn = Button.CreateSimpleButton("mentionBtn", "@");
-        mentionBtn.color = "#a6fffa";
-        mentionBtn.background = "transparent";
-        mentionBtn.thickness = 0;
-        mentionBtn.fontSize = 24;
-        mentionBtn.fontWeight = "bold";
-        mentionBtn.onPointerUpObservable.add(() => {
-             if (this._mentionPanel) {
-                 this._mentionPanel.isVisible = !this._mentionPanel.isVisible;
-                 if (this._emojiPanel) this._emojiPanel.isVisible = false;
-                 
-                 // Refresh list
-                 if (this._mentionPanel.isVisible) {
-                     this.refreshMentionList();
-                 }
-             }
-        });
-        inputGrid.addControl(mentionBtn, 0, 1);
+        // Mention Button - REMOVED
 
-        // Input Button (The trigger) - REMOVED for Always On
-        // ... (previous removal code)
-        
         // Update Overlay Position to match this spacer
-        // We need to do this dynamically or just hardcode it to fit in the center
         if (this._chatOverlay && this._chatOverlay.el) {
-            // Re-apply style to fit inside the grid row
             Object.assign(this._chatOverlay.el.style, {
-                position: "absolute", // Relative to window, but we need to position it carefully
+                position: "absolute", 
                 left: "50%",
-                bottom: "28px", // Align with bottom of chat container roughly
-                transform: "translateX(-50%)", // Centered
-                width: "calc(100% - 200px)", // Account for buttons (50+50+80 + padding)
+                bottom: "28px", 
+                transform: "translateX(-50%)", 
+                width: "calc(100% - 200px)", 
                 maxWidth: "600px",
                 height: "40px",
                 borderRadius: "10px",
@@ -341,15 +362,11 @@ export class Main extends State {
                 border: "1px solid #a6fffa",
                 fontSize: "16px",
                 textAlign: "left",
-                zIndex: "10001" // Above everything
+                zIndex: "10001" 
             });
-            
-            // Move it to be a child of the container if possible? No, it's document.body.
-            // We just need to make sure it shows/hides with the chat container.
         }
 
         // Send Button
-
         const sendBtn = Button.CreateSimpleButton("sendBtn", "Send");
         sendBtn.color = "#1b2b33";
         sendBtn.background = "#a6fffa";
@@ -369,15 +386,13 @@ export class Main extends State {
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = "Tap to chat...";
                     }
-                    // Keep visible for Always On
                     this._chatOverlay.el.focus();
-                    // this._chatOverlay.hide();
                 }
             }
         });
-        inputGrid.addControl(sendBtn, 0, 3);
+        inputGrid.addControl(sendBtn, 0, 2); // Was 3, now 2 because mention btn removed
 
-        // Emoji Picker Panel (Overlay inside container, centered)
+        // Emoji Picker Panel
         const emojiContainer = new Rectangle("emojiContainer");
         emojiContainer.width = "300px";
         emojiContainer.height = "200px";
@@ -420,87 +435,75 @@ export class Main extends State {
             btn.onPointerUpObservable.add(() => {
                 if (this._chatOverlay) {
                     this._chatOverlay.el.value += emo;
-                    // Update UI text immediately
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = this._chatOverlay.el.value;
                     }
-                    // Do NOT call show() to avoid keyboard popup
                 }
             });
             emojiGrid.addControl(btn, r, c);
         });
 
-        // Mention Picker Panel
-        const mentionContainer = new Rectangle("mentionContainer");
-        mentionContainer.width = "300px";
-        mentionContainer.height = "250px"; // Taller for list
-        mentionContainer.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-        mentionContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-        mentionContainer.top = "-90px"; // Above input row
-        mentionContainer.background = "#051116fa";
-        mentionContainer.color = "#a6fffa";
-        mentionContainer.thickness = 2;
-        mentionContainer.isVisible = false;
-        mentionContainer.zIndex = 101;
-        mentionContainer.cornerRadius = 12;
-        container.addControl(mentionContainer); 
-        this._mentionPanel = mentionContainer;
-
-        const mentionScroll = new ScrollViewer();
-        mentionScroll.width = "100%";
-        mentionScroll.height = "100%";
-        mentionScroll.thickness = 0;
-        mentionScroll.barSize = 5;
-        mentionScroll.barColor = "#a6fffa";
-        mentionContainer.addControl(mentionScroll);
-        
-        const mentionStack = new StackPanel();
-        mentionStack.width = "100%";
-        mentionScroll.addControl(mentionStack);
-        this._mentionListStack = mentionStack;
+        // Mention Picker Panel - REMOVED
     }
 
-    private refreshMentionList() {
-        if (!this._mentionListStack) return;
-        this._mentionListStack.clearControls();
+    private updateOnlineList(players: any[]) {
+        if (!this._onlineListStack || !this._onlineCountText) return;
         
-        // Get players from global lobby
-        const players = playService.globalLobbyState.players || [];
+        // Update Count
+        this._onlineCountText.text = `Online (${players.length})`;
+        
+        // Clear List
+        this._onlineListStack.clearControls();
+        
         const myId = playService.globalLobbyRoom?.sessionId;
         
         if (players.length === 0) {
-            const noOne = new TextBlock("noOne", "No one else online");
-            noOne.height = "40px";
-            noOne.color = "gray";
-            noOne.fontSize = 16;
-            this._mentionListStack.addControl(noOne);
+            // Should not happen if self is there, but handle empty
             return;
         }
 
-        players.forEach(p => {
-            // Don't mention self
-            if (p.session_id === myId) return;
+        // Sort: Me first, then others alphabetically
+        const sorted = [...players].sort((a, b) => {
+            if (a.session_id === myId) return -1;
+            if (b.session_id === myId) return 1;
+            return a.name.localeCompare(b.name);
+        });
 
-            const btn = Button.CreateSimpleButton("mention_" + p.session_id, "@" + p.name);
+        sorted.forEach(p => {
+            const isMe = p.session_id === myId;
+            const displayName = isMe ? `${p.name} (You)` : p.name;
+            
+            const btn = Button.CreateSimpleButton("player_" + p.session_id, displayName);
             btn.height = "40px";
             btn.width = "100%";
-            btn.color = "white";
+            btn.color = isMe ? "#a6fffa" : "white";
             btn.background = "transparent";
             btn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
             btn.textBlock!.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
             btn.textBlock!.paddingLeft = "10px";
             
+            // Mention Click Logic
             btn.onPointerUpObservable.add(() => {
+                if (isMe) return; // Don't mention self
+
                 if (this._chatOverlay) {
-                    this._chatOverlay.el.value += "@" + p.name + " ";
-                    // Update UI text immediately
+                    const current = this._chatOverlay.el.value;
+                    const mention = `@${p.name} `;
+                    
+                    // Append if not already present or simple logic
+                    this._chatOverlay.el.value = current + mention;
+                    
+                    // Update UI button
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = this._chatOverlay.el.value;
                     }
+                    
+                    // Focus
+                    this._chatOverlay.el.focus();
                 }
-                if (this._mentionPanel) this._mentionPanel.isVisible = false;
             });
-            this._mentionListStack!.addControl(btn);
+            
+            this._onlineListStack!.addControl(btn);
         });
     }
 
