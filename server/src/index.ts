@@ -7,6 +7,7 @@ import cors from "cors";
 import { monitor } from "@colyseus/monitor";
 import { GameRoom } from "./rooms/GameRoom";
 import { LobbyRoom } from "colyseus";
+import { GlobalLobbyRoom } from "./rooms/GlobalLobbyRoom";
 import crypto from "crypto";
 import type { Server as HttpServer } from "http";
 
@@ -97,6 +98,7 @@ httpServer.on("upgrade", (req, socket, head) => {
 });
 
 gameServer.define("lobby", LobbyRoom);
+gameServer.define("global_lobby", GlobalLobbyRoom);
 
 import { TaloService } from "./services/TaloService";
 

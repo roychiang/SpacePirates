@@ -73,28 +73,6 @@ export class Lobby extends State {
     })
     this._adt.addControl(root)
 
-    // Mute button (Upper Right)
-      const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
-      muteBtn.width = "60px";
-      muteBtn.height = "60px";
-      muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-      muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-      muteBtn.left = "-20px";
-      muteBtn.top = "20px";
-      if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
-        if (playService.voiceManager.isMuted()) {
-             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
-        }
-        muteBtn.onPointerClickObservable.add(() => {
-             const isMuted = playService.voiceManager.toggleMute();
-             if (isMuted) {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
-             } else {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
-             }
-        });
-      this._adt.addControl(muteBtn);
-
     // Players Online under username
     let playersText = avatarGrid.children.find(c => c.name === "globalPlayersOnline") as TextBlock
     if (!playersText) {

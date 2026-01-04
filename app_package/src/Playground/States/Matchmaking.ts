@@ -149,6 +149,13 @@ export class Matchmaking extends State {
       let url = ""
       let sessionId = Math.random().toString(36).slice(2)
 
+      // Use existing guest identity if available to ensure consistency with Main menu
+      const existingActor = playService.getActor();
+      if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
+          name = existingActor.name;
+          sessionId = existingActor.session_id;
+      }
+
       try {
         const token = await authService.getToken()
         if (token) {
@@ -191,6 +198,13 @@ export class Matchmaking extends State {
       let url = ""
       let sessionId = Math.random().toString(36).slice(2)
 
+      // Use existing guest identity if available to ensure consistency with Main menu
+      const existingActor = playService.getActor();
+      if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
+          name = existingActor.name;
+          sessionId = existingActor.session_id;
+      }
+
       try {
         const token = await authService.getToken()
         if (token) {
@@ -227,28 +241,7 @@ export class Matchmaking extends State {
     cancelBtn.onPointerDownObservable.add(() => {
       State.setCurrent(States.main)
     })
-    // Mute button (Upper Right)
-        const muteBtn = GuiFramework.createImageButton("mute_icon", Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg"));
-        muteBtn.width = "60px";
-        muteBtn.height = "60px";
-        muteBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-        muteBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-        muteBtn.left = "-20px";
-        muteBtn.top = "20px";
-        if (muteBtn.image) { muteBtn.image.width = "60px"; muteBtn.image.height = "60px"; }
-        if (playService.voiceManager.isMuted()) {
-             muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
-        }
-        muteBtn.onPointerClickObservable.add(() => {
-             const isMuted = playService.voiceManager.toggleMute();
-             if (isMuted) {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_off.svg");
-             } else {
-                 muteBtn.image!.source = Assets.joinUrl(Assets.globalAssetsHostUrl, "assets/UI/mic_on.svg");
-             }
-        });
-        this._adt.addControl(muteBtn);
-
+    
     this._adt.addControl(root)
     this.loadStatus()
     // Removed polling timer - we get real-time updates from onRoomListUpdate event
@@ -257,7 +250,7 @@ export class Matchmaking extends State {
 
   private async loadStatus() {
     console.log("[UI] Matchmaking loadStatus start")
-    let name = "Guest"
+    let name = playService.getGuestIdentity()
     let url = ""
     let token: string | undefined
 
@@ -272,9 +265,8 @@ export class Matchmaking extends State {
       }
     } catch (e) {
       console.warn("[UI] Auth failed (expected on localhost), using mock identity", e)
-      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        name = "Guest_" + Math.floor(Math.random() * 1000)
-      }
+      // Fallback to persistent Guest Identity
+      name = playService.getGuestIdentity();
     }
 
     console.log("[UI] Matchmaking profile", { name, url, hasToken: !!token })

@@ -4,6 +4,7 @@ import { GameSession } from "./GameSession";
 import { Main } from "./Main";
 import { GameDefinition } from "../Game";
 import { InputManager } from "../Inputs/Input";
+import { playService } from "../../Viverse/Viverse";
 
 export class GameState extends State {
 
@@ -19,6 +20,12 @@ export class GameState extends State {
         super.enter();
 
         Main.diorama?.setEnable(null);
+
+        // Initialize P2P Audio for Gameplay (Spaceship/Teammates)
+        // Ensure playService is available and connected to room
+        if (typeof playService !== 'undefined' && playService.colyseusRoom) {
+             playService.voiceManager.initialize(playService.colyseusRoom.sessionId).catch(console.error);
+        }
 
         if (!GameState.gameSession?.inProgress()) {
             GameState.gameSession?.start(GameState.gameDefinition);

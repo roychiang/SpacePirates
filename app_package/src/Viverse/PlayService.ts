@@ -40,6 +40,8 @@ export class PlayService {
 
   private client?: Colyseus.Client
   public colyseusRoom?: Colyseus.Room
+  public globalLobbyRoom?: Colyseus.Room
+  public globalLobbyState: { players: Actor[] } = { players: [] }
   public voiceManager: VoiceManager = new VoiceManager();
 
   // Default to local dev, user should update this for prod
@@ -53,6 +55,102 @@ export class PlayService {
     this.client = new Colyseus.Client(this.endpoint);
     this.connected = true;
     this.emit("connected");
+  }
+
+  async joinGlobalLobby(): Promise<void> {
+    if (!this.client) {
+        await this.newMatchmakingClient(this.appId);
+    }
+    // If already in global lobby, do nothing
+    if (this.globalLobbyRoom) return;
+
+    // If currently in a game room, do NOT join global lobby (enforce single room policy)
+    if (this.colyseusRoom) return;
+
+    try {
+      // Ensure we have a valid name. If actor is not set, or name is generic "Guest", use persistent Guest Identity.
+      let name = this.actor?.name;
+      if (!name || name === "Guest") {
+          name = this.getGuestIdentity();
+      }
+
+      const options = {
+        name: name,
+        headIconUrl: this.actor?.properties?.headIconUrl || ""
+      };
+      console.log("[Play] Joining Global Lobby...", options);
+      this.globalLobbyRoom = await this.client!.joinOrCreate("global_lobby", options);
+      console.log("[Play] Joined Global Lobby. ID:", this.globalLobbyRoom.roomId, "Session:", this.globalLobbyRoom.sessionId);
+      
+      // Initialize P2P Voice for Global Lobby - DISABLED as per user request (Only for Co-op Game)
+      // this.voiceManager.initialize(this.globalLobbyRoom.sessionId).catch(console.error);
+
+      this.globalLobbyRoom.onStateChange((state: any) => {
+          // console.log("[Play] Global Lobby State Change:", state.players.size, "players");
+          const players: Actor[] = [];
+          state.players.forEach((p: any, sessionId: string) => {
+              players.push({
+                  session_id: sessionId,
+                  name: p.name,
+                  properties: { headIconUrl: p.headIconUrl }
+              });
+          });
+          this.globalLobbyState.players = players;
+          this.emit("globalLobbyUpdated", players);
+      });
+
+      this.globalLobbyRoom.onMessage("chat", (msg: { senderId: string, name: string, text: string }) => {
+          console.log("[Play] Global Chat Message Received from Server:", msg);
+          this.emit("globalChatReceived", msg);
+      });
+
+      this.globalLobbyRoom.onLeave(() => {
+          this.globalLobbyRoom = undefined;
+          this.globalLobbyState.players = [];
+          this.emit("globalLobbyUpdated", []);
+          
+          // Cleanup Voice when leaving global lobby (if not switching to game room immediately)
+          // But wait, if we switch to game room, we probably want to re-init voice there.
+          // The GameState logic already initializes voice for the game room.
+          // So we should probably close voice here to avoid conflict or double connection?
+          // Actually, VoiceManager handles re-init by destroying previous peer if needed.
+          // So explicit leave() might be safer.
+          // However, PlayService.ts logic for "onLeave" is triggered when connection is lost or manually left.
+          
+          // Let's leave voice if we are leaving the lobby.
+          // If we are joining a game, we will re-init voice in GameState.
+          this.voiceManager.leave();
+      });
+      
+    } catch (e) {
+      console.warn("[Play] Failed to join global lobby", e);
+    }
+  }
+
+  async sendGlobalChat(text: string) {
+      if (!this.globalLobbyRoom) {
+          console.warn("[Play] Not connected to global lobby, attempting to connect before sending...");
+          await this.joinGlobalLobby();
+      }
+      
+      if (this.globalLobbyRoom) {
+          console.log("[Play] Sending Global Chat:", text);
+          this.globalLobbyRoom.send("chat", text);
+      } else {
+          console.error("[Play] Failed to send chat, still not connected.");
+      }
+  }
+
+  async leaveGlobalLobby(): Promise<void> {
+      if (this.globalLobbyRoom) {
+          console.log("[Play] Leaving Global Lobby");
+          try {
+              await this.globalLobbyRoom.leave();
+          } catch(e) {}
+          this.globalLobbyRoom = undefined;
+          this.globalLobbyState.players = [];
+          this.emit("globalLobbyUpdated", []);
+      }
   }
 
   private async recoverRoom(): Promise<boolean> {
@@ -73,7 +171,18 @@ export class PlayService {
     
     // Attempt to sync player name to Talo immediately if we have an identity
     const identity = this.getIdentity();
-    const name = actor?.name || (actor?.properties as any)?.displayName;
+    
+    // Force consistency for Guests: If identity is persistent Guest ID, ensure actor name matches it.
+    // This prevents random temporary IDs from Main.ts from overriding the persistent identity.
+    if (identity && identity.startsWith("Guest_") && actor.name !== identity) {
+        console.log(`[Play] Enforcing Guest Identity consistency. Name ${actor.name} -> ${identity}`);
+        this.actor.name = identity;
+        if (this.actor.properties) {
+             (this.actor.properties as any).displayName = identity;
+        }
+    }
+
+    const name = this.actor.name || (this.actor.properties as any)?.displayName;
 
     if (identity) {
       // TaloClient needs identity set first
@@ -83,7 +192,7 @@ export class PlayService {
       }
     }
 
-    this.emit("actorJoined", actor)
+    this.emit("actorJoined", this.actor)
     return { success: true }
   }
 
@@ -128,6 +237,9 @@ export class PlayService {
     properties?: Record<string, any>
   }): Promise<CreateRoomResult> {
     if (!this.client) return { success: false, message: "No client" }
+
+    // Ensure we leave the global lobby before creating a game room
+    await this.leaveGlobalLobby();
 
     try {
       const userId = this.getIdentity();
@@ -181,10 +293,10 @@ export class PlayService {
 
       this.emit("roomUpdated", this.room);
 
-      // Initialize Voice Peer
-      if (this.colyseusRoom) {
-          await this.voiceManager.initialize(this.colyseusRoom.sessionId);
-      }
+      // Initialize Voice Peer - Moved to GameState to ensure audio only in game
+      // if (this.colyseusRoom) {
+      //     await this.voiceManager.initialize(this.colyseusRoom.sessionId);
+      // }
 
       return { success: true, room: this.room };
     } catch (e) {
@@ -216,6 +328,9 @@ export class PlayService {
 
   async joinRoom(roomId: string): Promise<JoinRoomResult> {
     if (!this.client) return { success: false, message: "No client" }
+
+    // Ensure we leave the global lobby before joining a game room
+    await this.leaveGlobalLobby();
 
     try {
       const userId = this.getIdentity();
@@ -286,6 +401,11 @@ export class PlayService {
     }
     this.room = undefined as any;
     this.emit("actorLeft", this.actor);
+
+    // Rejoin global lobby after leaving game room
+    // Use a small delay to ensure cleanup is done
+    setTimeout(() => this.joinGlobalLobby(), 500);
+
     return { success: true };
   }
 
@@ -320,11 +440,11 @@ export class PlayService {
     this.colyseusRoom?.send("gameEnd", payload);
   }
 
-  async getAvailableRooms(): Promise<{ success: boolean; rooms: Room[] }> {
+  async getAvailableRooms(roomName: string = "game_room"): Promise<{ success: boolean; rooms: Room[] }> {
     if (!this.client) return { success: false, rooms: [] }
 
     try {
-      const rooms = await (this.client as any).getAvailableRooms("game_room");
+      const rooms = await (this.client as any).getAvailableRooms(roomName);
       if (!Array.isArray(rooms)) {
         console.warn("getAvailableRooms: Expected array but got", rooms);
         return { success: false, rooms: [] };
@@ -380,21 +500,59 @@ export class PlayService {
     // No-op for Colyseus, handled by join
   }
 
+  public getGuestIdentity(): string {
+    if (!this._guestIdentity) {
+        // Check local storage for existing guest ID to persist across reloads
+        try {
+            const stored = localStorage.getItem("sp_guest_identity");
+            if (stored) {
+                this._guestIdentity = stored;
+            }
+        } catch (e) {}
+
+        if (!this._guestIdentity) {
+            this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
+            try {
+                localStorage.setItem("sp_guest_identity", this._guestIdentity);
+            } catch (e) {}
+            
+            // Proactively update name for this new guest identity
+            console.log("[Play] Generated new Guest Identity:", this._guestIdentity);
+            TaloClient.identify(this._guestIdentity);
+            TaloClient.updatePlayer(this._guestIdentity);
+        }
+    }
+    return this._guestIdentity;
+  }
+
   private getIdentity(): string {
     // Priority 1: Persistent User ID (Viverse)
     if (this.actor?.userId) return String(this.actor.userId);
     if (this.actor?.properties && (this.actor.properties as any).userId) return String((this.actor.properties as any).userId);
     
     // Priority 2: Persistent Guest ID
-    // We do NOT want to use session_id as identity because it changes per game/room.
-    if (!this._guestIdentity) {
-        this._guestIdentity = "Guest_" + Math.floor(Math.random() * 1000000);
-        // Proactively update name for this new guest identity
-        console.log("[Play] Generated new Guest Identity:", this._guestIdentity);
-        TaloClient.identify(this._guestIdentity);
-        TaloClient.updatePlayer(this._guestIdentity);
-    }
-    return this._guestIdentity;
+    return this.getGuestIdentity();
+  }
+
+  async getAllPlayersCount(): Promise<number> {
+      if (!this.client) return 0;
+      try {
+          const [gameRooms, lobbyRooms] = await Promise.all([
+              (this.client as any).getAvailableRooms("game_room"),
+              (this.client as any).getAvailableRooms("global_lobby")
+          ]);
+          
+          let total = 0;
+          if (Array.isArray(gameRooms)) {
+              total += gameRooms.reduce((acc: number, r: any) => acc + (r.clients || 0), 0);
+          }
+          if (Array.isArray(lobbyRooms)) {
+              total += lobbyRooms.reduce((acc: number, r: any) => acc + (r.clients || 0), 0);
+          }
+          return total;
+      } catch (e) {
+          return 0;
+      }
   }
 
   async getPlayerStats(mode?: "single" | "coop"): Promise<{ kills: number; wins: number }> {
@@ -428,7 +586,7 @@ export class PlayService {
       this.colyseusRoom?.send("playerDied", { index });
   }
 
-  on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd" | "playerDied" | "enemyKilled" | "leaderboardData", handler: Handler) {
+  on(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd" | "playerDied" | "enemyKilled" | "leaderboardData" | "globalLobbyUpdated" | "globalChatReceived", handler: Handler) {
     if (!this.listeners[event]) this.listeners[event] = []
     this.listeners[event].push(handler)
   }
@@ -438,7 +596,7 @@ export class PlayService {
     for (const h of arr) h(payload)
   }
 
-  off(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd" | "playerDied" | "enemyKilled" | "leaderboardData", handler: Handler) {
+  off(event: "roomUpdated" | "actorJoined" | "actorLeft" | "readyStateChanged" | "connected" | "roomListUpdated" | "remoteInput" | "remoteShot" | "spawnEnemy" | "gameStateUpdate" | "gameEnd" | "playerDied" | "enemyKilled" | "leaderboardData" | "globalLobbyUpdated" | "globalChatReceived", handler: Handler) {
     const arr = this.listeners[event] || []
     this.listeners[event] = arr.filter(h => h !== handler)
   }

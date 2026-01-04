@@ -1,4 +1,4 @@
-import { ContainerAssetTask, TransformNode, AbstractMesh, Tools, Scene, TextFileAssetTask, MeshAssetTask, Nullable, NodeMaterial, Texture, NodeMaterialBlock, TextureBlock, Vector3, CubeTexture, Sound, AssetContainer, Color3, InputBlock, AssetsManager } from "@babylonjs/core";
+import { ContainerAssetTask, TransformNode, AbstractMesh, Tools, Scene, TextFileAssetTask, MeshAssetTask, Nullable, NodeMaterial, Texture, NodeMaterialBlock, TextureBlock, Vector3, CubeTexture, Sound, AssetContainer, Color3, InputBlock, AssetsManager, Observable } from "@babylonjs/core";
 import { useNative } from "..";
 import { PlanetBaker } from "./FX/PlanetBaker";
 import { Parameters } from "./Parameters";
@@ -51,6 +51,7 @@ export class Assets {
     public projectile: Nullable<AbstractMesh> = null;
 
     public static loadingComplete: boolean = false;
+    public static onLoadingCompleteObservable = new Observable<void>();
     public static globalAssetsHostUrl: string;
 
     // Helper function to properly join URLs without double slashes
@@ -229,6 +230,7 @@ export class Assets {
                                             (_this.starfieldTextureBlock as TextureBlock).texture = starfieldTexture;
                                         }
                                         Assets.loadingComplete = true;
+                                        Assets.onLoadingCompleteObservable.notifyObservers();
                                         whenLoadingComplete(this);
                                         console.log("Complete asset loading done");
                                     });

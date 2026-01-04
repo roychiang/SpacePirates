@@ -22,6 +22,7 @@ const cors_1 = __importDefault(require("cors"));
 const monitor_1 = require("@colyseus/monitor");
 const GameRoom_1 = require("./rooms/GameRoom");
 const colyseus_2 = require("colyseus");
+const GlobalLobbyRoom_1 = require("./rooms/GlobalLobbyRoom");
 const crypto_1 = __importDefault(require("crypto"));
 if (process.env.NODE_ENV === "production") {
     console.log = function () { };
@@ -115,6 +116,7 @@ httpServer.on("upgrade", (req, socket, head) => {
     }
 });
 gameServer.define("lobby", colyseus_2.LobbyRoom);
+gameServer.define("global_lobby", GlobalLobbyRoom_1.GlobalLobbyRoom);
 const TaloService_1 = require("./services/TaloService");
 // Register GameRoom
 gameServer.define("game_room", GameRoom_1.GameRoom)

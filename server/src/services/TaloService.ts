@@ -77,20 +77,20 @@ export class TaloService {
             });
 
             if (!resIdentify.ok) {
-                 console.warn(`[TaloService] updatePlayer: Identify failed ${resIdentify.status}`);
+                 console.warn(`[TaloService] updatePlayer: Identify failed ${resIdentify.status} for ${identifier}`);
                  return;
             }
             const dataIdentify = await resIdentify.json();
             const playerId = dataIdentify?.player?.id || dataIdentify?.player_id || dataIdentify?.playerId;
 
             if (!playerId) {
-                 console.warn(`[TaloService] updatePlayer: No playerId found in identify response`, dataIdentify);
+                 console.warn(`[TaloService] updatePlayer: No playerId found in identify response for ${identifier}`, JSON.stringify(dataIdentify));
                  return;
             }
 
             // 2. Update Player Properties
             const urlUpdate = `${this.baseUrl}/players/${playerId}`;
-            await fetch(urlUpdate, {
+            const resUpdate = await fetch(urlUpdate, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
@@ -102,9 +102,16 @@ export class TaloService {
                     }
                 })
             });
-            console.log(`[TaloService] Updated player name for ${identifier} to ${name}`);
+
+            if (!resUpdate.ok) {
+                const text = await resUpdate.text();
+                console.warn(`[TaloService] updatePlayer: PATCH failed ${resUpdate.status} - ${text}`);
+            } else {
+                const updated = await resUpdate.json();
+                console.log(`[TaloService] updatePlayer: Success for ${identifier} -> ${name}`, JSON.stringify(updated));
+            }
         } catch (e) {
-            console.error("[TaloService] updatePlayer failed", e);
+            console.error("[TaloService] updatePlayer error:", e);
         }
     }
 
@@ -115,7 +122,12 @@ export class TaloService {
             
             // 0. Update Player Name if provided
             if (playerName) {
-                await this.updatePlayer(playerIdentifier, playerName);
+                // Ensure we update name BEFORE reporting scores so leaderboard entry has correct name
+                try {
+                    await this.updatePlayer(playerIdentifier, playerName);
+                } catch (e) {
+                    console.warn(`[TaloService] Failed to update player name '${playerName}' for ${playerIdentifier}:`, e);
+                }
             }
 
             // 1. Send Game End Event

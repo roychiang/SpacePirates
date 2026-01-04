@@ -44,6 +44,12 @@ export class Leaderboard extends State {
     if (!this._adt) return
     this._isActive = true
 
+    // Ensure top-left avatar is shown
+    const actor = playService.getActor();
+    if (actor) {
+        GuiFramework.updateTopLeftAvatar(actor.name, (actor.properties?.headIconUrl as string) || "", this._adt);
+    }
+
     this._onLeaderboardData = (message: any) => {
       if (!this._isActive) return;
       const alias = message?.alias ? String(message.alias) : "";
@@ -70,16 +76,21 @@ export class Leaderboard extends State {
           GuiFramework.setFont(rank, true, false);
           row.addControl(rank, 0, 0);
 
-          const nRaw = entry?.member?.username || entry?.playerAlias || "Unknown";
+          const alias = entry?.member || entry?.playerAlias || entry?.player_alias;
+          const nRaw = alias || "Unknown";
           let n = String(nRaw);
-          if (entry?.member?.props?.name) {
-              n = entry.member.props.name;
-          } else if (entry?.playerAlias?.player?.props?.name) {
-              n = entry.playerAlias.player.props.name;
-          } else if (typeof nRaw === 'object') {
-              if (nRaw.username) n = nRaw.username;
-              else if (nRaw.identifier) n = nRaw.identifier;
-              else if (nRaw.id) n = `Player ${nRaw.id}`;
+          
+          // Try to get name from props (camelCase or snake_case)
+          const playerProps = entry?.member?.props || 
+                            alias?.player?.props || 
+                            alias?.player?.properties; 
+
+          if (playerProps && playerProps.name) {
+              n = playerProps.name;
+          } else if (typeof alias === 'object') {
+              if (alias.username) n = alias.username;
+              else if (alias.identifier) n = alias.identifier;
+              else if (alias.id) n = `Player ${alias.id}`;
               else n = "Unknown";
           }
           const name = new TextBlock("name", n);
@@ -230,6 +241,7 @@ export class Leaderboard extends State {
           } else {
               // Fallback to direct API if not connected (legacy)
               TaloClient.getLeaderboard(internalName).then((data: any) => {
+                  if (!this._isActive) return;
                   if (data && data.entries) {
                       data.entries.forEach((entry: any) => {
                           const row = new Grid(); // Use Grid for better alignment
@@ -245,16 +257,21 @@ export class Leaderboard extends State {
                           GuiFramework.setFont(rank, true, false);
                           row.addControl(rank, 0, 0);
 
-                          const nRaw = entry?.member?.username || entry?.playerAlias || "Unknown";
+                          const alias = entry?.member || entry?.playerAlias || entry?.player_alias;
+                          const nRaw = alias || "Unknown";
                           let n = String(nRaw);
-                          if (entry?.member?.props?.name) {
-                              n = entry.member.props.name;
-                          } else if (entry?.playerAlias?.player?.props?.name) {
-                              n = entry.playerAlias.player.props.name;
-                          } else if (typeof nRaw === 'object') {
-                              if (nRaw.username) n = nRaw.username;
-                              else if (nRaw.identifier) n = nRaw.identifier;
-                              else if (nRaw.id) n = `Player ${nRaw.id}`;
+                          
+                          // Try to get name from props (camelCase or snake_case)
+                          const playerProps = entry?.member?.props || 
+                                            alias?.player?.props || 
+                                            alias?.player?.properties; 
+                
+                          if (playerProps && playerProps.name) {
+                              n = playerProps.name;
+                          } else if (typeof alias === 'object') {
+                              if (alias.username) n = alias.username;
+                              else if (alias.identifier) n = alias.identifier;
+                              else if (alias.id) n = `Player ${alias.id}`;
                               else n = "Unknown";
                           }
                           const name = new TextBlock("name", n);
@@ -281,6 +298,7 @@ export class Leaderboard extends State {
                       entriesPanel.addControl(noData);
                   }
               }).catch((e) => {
+                  if (!this._isActive) return;
                   console.warn("Failed to load leaderboard " + internalName, e);
                   const errText = new TextBlock("err", "Could not load data");
                   errText.color = "red";
