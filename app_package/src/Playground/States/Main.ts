@@ -35,7 +35,7 @@ export class Main extends State {
     private _chatOrb?: Button;
     private _notificationBadge?: Control; 
     private _keyboardHandler?: (e: KeyboardEvent) => void;
-    private _inputBtnRef?: Button; 
+    private _inputBtnRef?: Button;
 
     private onChatReceived = (msg: { senderId: string, name: string, text: string }) => {
         if (!this._chatContent) return;
@@ -93,56 +93,93 @@ export class Main extends State {
         if (this._chatRoot) return;
 
         // Subscribe to global lobby updates for the list
-        playService.on("globalLobbyUpdated", (players: any[]) => {
+        this._lobbyHandler = (players: any[]) => {
             this.updateOnlineList(players);
-        });
+        };
+        playService.on("globalLobbyUpdated", this._lobbyHandler);
 
-        // Input Placeholder Button (Ref needed early for sync)
+        // Input Placeholder Button - RE-ADDED
         const inputBtn = Button.CreateSimpleButton("inputBtn", "Tap to chat...");
-        this._inputBtnRef = inputBtn;
-        
-        // Ensure text doesn't block button click
+        inputBtn.color = "white";
+        inputBtn.background = "rgba(0,0,0,0.3)";
+        inputBtn.thickness = 1;
+        inputBtn.cornerRadius = 10;
+        inputBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        inputBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+        inputBtn.height = "40px";
+        inputBtn.width = "95%";
         if (inputBtn.textBlock) {
-            inputBtn.textBlock.isHitTestVisible = false;
-            inputBtn.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-            inputBtn.textBlock.paddingLeft = "20px";
+            inputBtn.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         }
+        inputBtn.onPointerUpObservable.add(() => {
+            if (this._chatOverlay) {
+                this._chatOverlay.el.focus();
+                if (this._inputBtnRef && this._inputBtnRef.textBlock) {
+                    if (this._inputBtnRef.textBlock.text === "Tap to chat...") {
+                        this._inputBtnRef.textBlock.text = "";
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                        this._inputBtnRef.textBlock.paddingLeft = "10px";
+                    }
+                }
+            }
+        });
+        this._inputBtnRef = inputBtn;
+
+        // Input Area
 
         // Chat Input Overlay (HTML-based for IME support)
         if (!this._chatOverlay) {
             this._chatOverlay = createChatInputOverlay(
                 (text) => {
                     console.log("[Main] Overlay onSend triggered:", text);
-                    // Sync text to Babylon UI button
-                    if (inputBtn.textBlock) {
-                        inputBtn.textBlock.text = text || "Tap to chat...";
-                    }
                     playService.sendGlobalChat(text);
+                    if (this._inputBtnRef && this._inputBtnRef.textBlock) {
+                        this._inputBtnRef.textBlock.text = "Tap to chat...";
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+                        this._inputBtnRef.textBlock.paddingLeft = "0px";
+                    }
                 },
                 (text) => {
-                    // Sync text to Babylon UI button
-                    if (inputBtn.textBlock) {
-                        inputBtn.textBlock.text = text || "Tap to chat...";
+                    // Sync text to button
+                    if (this._inputBtnRef && this._inputBtnRef.textBlock) {
+                         if (text && text.length > 0) {
+                            this._inputBtnRef.textBlock.text = text;
+                            this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                            this._inputBtnRef.textBlock.paddingLeft = "10px";
+                         } else {
+                            this._inputBtnRef.textBlock.text = "Tap to chat...";
+                            this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+                            this._inputBtnRef.textBlock.paddingLeft = "0px";
+                         }
                     }
                 },
                 {
-                    left: "50%",
-                    right: "auto",
-                    bottom: "35px", // Match new position
-                    transform: "translateX(-50%)",
-                    width: "calc(100% - 200px)", // Match new width logic
-                    maxWidth: "600px",
-                    height: "40px",
-                    borderRadius: "10px",
-                    background: "rgba(0,0,0,0.5)", 
-                    border: "1px solid #a6fffa",
+                    position: "absolute",
+                    top: "-1000px", // Off-screen but focusable
+                    left: "-1000px",
+                    width: "1px",
+                    height: "1px",
+                    opacity: "0",
+                    background: "transparent", 
+                    border: "none",
+                    color: "transparent",
                     fontSize: "16px",
-                    textAlign: "left",
-                    display: "none" // Initially hidden until chat opens
+                    zIndex: "10001",
+                    outline: "none"
                 }
             );
-        }
 
+            // Revert to placeholder on blur if empty
+            this._chatOverlay.el.addEventListener("blur", () => {
+                if (this._chatOverlay && this._chatOverlay.el.value.length === 0) {
+                    if (this._inputBtnRef && this._inputBtnRef.textBlock) {
+                        this._inputBtnRef.textBlock.text = "Tap to chat...";
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+                        this._inputBtnRef.textBlock.paddingLeft = "0px";
+                    }
+                }
+            });
+        }
         // 1. Chat Orb (Toggle Button)
             const orb = Button.CreateSimpleButton("chatOrb", "💬");
             orb.width = "60px";
@@ -180,8 +217,9 @@ export class Main extends State {
 
                         // Show Input Overlay
                         if (this._chatOverlay) {
+                             // Keep overlay in DOM but invisible/offscreen
                              this._chatOverlay.el.style.display = "block";
-                             this._chatOverlay.el.focus();
+                             // Focus input button if needed
                         }
                     } else {
                         // Hide Input Overlay
@@ -239,7 +277,7 @@ export class Main extends State {
         const mainGrid = new Grid();
         mainGrid.addRowDefinition(60, true);   // Header (Title + Close)
         mainGrid.addRowDefinition(1.0, false); // Content Area (Chat + List)
-        mainGrid.addRowDefinition(80, true);   // Input area
+        mainGrid.addRowDefinition(60, true);   // Input area
         container.addControl(mainGrid);
 
         // Header
@@ -327,11 +365,10 @@ export class Main extends State {
         inputGrid.height = "60px";
         inputGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP; // Align top of this row
         inputGrid.addColumnDefinition(50, true); // Emoji btn
-        // inputGrid.addColumnDefinition(50, true); // Mention btn (REMOVED)
-        inputGrid.addColumnDefinition(1.0, false); // Input Spacer for HTML Overlay
+        inputGrid.addColumnDefinition(1.0, false); // Input Button
         inputGrid.addColumnDefinition(80, true); // Send btn
         mainGrid.addControl(inputGrid, 2, 0);
-
+        
         // Emoji Button
         const emojiBtn = Button.CreateSimpleButton("emojiBtn", "😀");
         emojiBtn.color = "#a6fffa";
@@ -345,25 +382,9 @@ export class Main extends State {
         });
         inputGrid.addControl(emojiBtn, 0, 0);
 
-        // Mention Button - REMOVED
-
-        // Update Overlay Position to match this spacer
-        if (this._chatOverlay && this._chatOverlay.el) {
-            Object.assign(this._chatOverlay.el.style, {
-                position: "absolute", 
-                left: "50%",
-                bottom: "28px", 
-                transform: "translateX(-50%)", 
-                width: "calc(100% - 200px)", 
-                maxWidth: "600px",
-                height: "40px",
-                borderRadius: "10px",
-                background: "rgba(0,0,0,0.5)", 
-                border: "1px solid #a6fffa",
-                fontSize: "16px",
-                textAlign: "left",
-                zIndex: "10001" 
-            });
+        // Input Button
+        if (this._inputBtnRef) {
+            inputGrid.addControl(this._inputBtnRef, 0, 1);
         }
 
         // Send Button
@@ -383,14 +404,17 @@ export class Main extends State {
                 if (text) {
                     playService.sendGlobalChat(text);
                     this._chatOverlay.el.value = "";
+                    this._chatOverlay.el.focus();
+                    
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = "Tap to chat...";
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+                        this._inputBtnRef.textBlock.paddingLeft = "0px";
                     }
-                    this._chatOverlay.el.focus();
                 }
             }
         });
-        inputGrid.addControl(sendBtn, 0, 2); // Was 3, now 2 because mention btn removed
+        inputGrid.addControl(sendBtn, 0, 2); 
 
         // Emoji Picker Panel
         const emojiContainer = new Rectangle("emojiContainer");
@@ -412,6 +436,23 @@ export class Main extends State {
         emojiGrid.width = "1.0";
         emojiGrid.height = "1.0";
         emojiContainer.addControl(emojiGrid);
+
+        // Emoji Menu Close Button
+        const emoCloseBtn = Button.CreateSimpleButton("emoClose", "X");
+        emoCloseBtn.width = "30px";
+        emoCloseBtn.height = "30px";
+        emoCloseBtn.color = "white";
+        emoCloseBtn.background = "#ff0000aa";
+        emoCloseBtn.cornerRadius = 15;
+        emoCloseBtn.fontSize = 14;
+        emoCloseBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        emoCloseBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        emoCloseBtn.top = "-10px";
+        emoCloseBtn.left = "10px";
+        emoCloseBtn.onPointerUpObservable.add(() => {
+            emojiContainer.isVisible = false;
+        });
+        emojiContainer.addControl(emoCloseBtn);
 
         const emojis = ["😀", "😂", "😍", "😎", "🤔", "😭", "👍", "👎", "🔥", "❤️", "🚀", "👋", "🙏", "💪", "🎉", "👻"];
         const cols = 4;
@@ -437,7 +478,12 @@ export class Main extends State {
                     this._chatOverlay.el.value += emo;
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = this._chatOverlay.el.value;
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                        this._inputBtnRef.textBlock.paddingLeft = "10px";
                     }
+                }
+                if (this._emojiPanel) {
+                    this._emojiPanel.isVisible = false;
                 }
             });
             emojiGrid.addControl(btn, r, c);
@@ -493,11 +539,12 @@ export class Main extends State {
                     // Append if not already present or simple logic
                     this._chatOverlay.el.value = current + mention;
                     
-                    // Update UI button
                     if (this._inputBtnRef && this._inputBtnRef.textBlock) {
                         this._inputBtnRef.textBlock.text = this._chatOverlay.el.value;
+                        this._inputBtnRef.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+                        this._inputBtnRef.textBlock.paddingLeft = "10px";
                     }
-                    
+
                     // Focus
                     this._chatOverlay.el.focus();
                 }
@@ -565,16 +612,18 @@ export class Main extends State {
         // Setup Keyboard Handler
         this._keyboardHandler = (e: KeyboardEvent) => {
             // Only if overlay is not already showing
-            if (this._chatOverlay && this._chatOverlay.el.style.display === "none") {
+            // if (this._chatOverlay && this._chatOverlay.el.style.display === "none") {
                 if (e.key === "Enter") {
                     const active = document.activeElement;
                     const isInput = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
                     if (!isInput) {
                         e.preventDefault();
-                        this._chatOverlay.show();
+                        if (this._chatOverlay) {
+                            this._chatOverlay.el.focus();
+                        }
                     }
                 }
-            }
+            // }
         };
         window.addEventListener("keydown", this._keyboardHandler);
 

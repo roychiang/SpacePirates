@@ -94,7 +94,8 @@ export class Matchmaking extends State {
     const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt)
     let playersText = avatarGrid.children.find((c: Control) => c.name === "globalPlayersOnline") as TextBlock
     if (!playersText) {
-      playersText = new TextBlock("globalPlayersOnline", "Players Online: --")
+      const label = this.pvpMode ? "Players Online" : "CO-OP Online";
+      playersText = new TextBlock("globalPlayersOnline", `${label}: --`)
       GuiFramework.setFont(playersText, true, true)
       playersText.color = "#a6fffa"
       playersText.fontSize = 24
