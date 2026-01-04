@@ -132,7 +132,8 @@ export class Matchmaking extends State {
         const t = (this as any)._playersOnlineText as TextBlock
         if (t) {
              t.text = ""
-             t.text = `Players Online: ${total}`
+             const label = this.pvpMode ? "Players Online" : "CO-OP Online";
+             t.text = `${label}: ${total}`
         }
       }).catch(() => {})
     }
