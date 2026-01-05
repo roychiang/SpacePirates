@@ -57,7 +57,7 @@ export class Main extends State {
         textBlock.resizeToFit = true;
         textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
         textBlock.paddingLeft = "5px";
-        textBlock.fontSize = 18;
+        textBlock.fontSize = 32; // Increased from 24
         
         // Formatting
         if (isMe) {
@@ -104,6 +104,7 @@ export class Main extends State {
         inputBtn.background = "rgba(0,0,0,0.3)";
         inputBtn.thickness = 1;
         inputBtn.cornerRadius = 10;
+        inputBtn.fontSize = 26; // Increased
         inputBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         inputBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
         inputBtn.height = "40px";
@@ -163,7 +164,7 @@ export class Main extends State {
                     background: "transparent", 
                     border: "none",
                     color: "transparent",
-                    fontSize: "16px",
+                    fontSize: "28px", // Increased from 20px
                     zIndex: "10001",
                     outline: "none"
                 }
@@ -255,7 +256,7 @@ export class Main extends State {
         badge.isHitTestVisible = false;
         const badgeText = new TextBlock("badgeText", "!");
         badgeText.color = "white";
-        badgeText.fontSize = 14;
+        badgeText.fontSize = 24; // Increased from 18
         badgeText.fontWeight = "bold";
         badge.addControl(badgeText);
         this._adt.addControl(badge);
@@ -288,7 +289,7 @@ export class Main extends State {
 
         const title = new TextBlock("chatTitle", "Global Chat");
         title.color = "#a6fffa";
-        title.fontSize = 24;
+        title.fontSize = 40; // Increased from 30
         title.fontFamily = GuiFramework.guiFont.family;
         headerGrid.addControl(title, 0, 0);
 
@@ -296,7 +297,7 @@ export class Main extends State {
         closeBtn.color = "white";
         closeBtn.background = "transparent";
         closeBtn.thickness = 0;
-        closeBtn.fontSize = 24;
+        closeBtn.fontSize = 40; // Increased from 30
         closeBtn.onPointerUpObservable.add(() => {
             container.isVisible = false;
             if (this._chatOverlay) {
@@ -339,7 +340,7 @@ export class Main extends State {
 
         const onlineHeader = new TextBlock("onlineHeader", "Online (0)");
         onlineHeader.color = "#a6fffa";
-        onlineHeader.fontSize = 18;
+        onlineHeader.fontSize = 28; // Increased from 22
         onlineHeader.fontWeight = "bold";
         onlineGrid.addControl(onlineHeader, 0, 0);
         this._onlineCountText = onlineHeader;
@@ -374,7 +375,7 @@ export class Main extends State {
         emojiBtn.color = "#a6fffa";
         emojiBtn.background = "transparent";
         emojiBtn.thickness = 0;
-        emojiBtn.fontSize = 24;
+        emojiBtn.fontSize = 40; // Increased from 30
         emojiBtn.onPointerUpObservable.add(() => {
             if (this._emojiPanel) {
                 this._emojiPanel.isVisible = !this._emojiPanel.isVisible;
@@ -392,7 +393,7 @@ export class Main extends State {
         sendBtn.color = "#1b2b33";
         sendBtn.background = "#a6fffa";
         sendBtn.thickness = 0;
-        sendBtn.fontSize = 16;
+        sendBtn.fontSize = 26; // Increased from 20
         sendBtn.fontWeight = "bold";
         sendBtn.cornerRadius = 10;
         sendBtn.height = "50px";
@@ -444,7 +445,7 @@ export class Main extends State {
         emoCloseBtn.color = "white";
         emoCloseBtn.background = "#ff0000aa";
         emoCloseBtn.cornerRadius = 15;
-        emoCloseBtn.fontSize = 14;
+        emoCloseBtn.fontSize = 24; // Increased from 18
         emoCloseBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
         emoCloseBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
         emoCloseBtn.top = "-10px";
@@ -524,6 +525,7 @@ export class Main extends State {
             btn.width = "100%";
             btn.color = isMe ? "#a6fffa" : "white";
             btn.background = "transparent";
+            btn.fontSize = 26; // Explicitly set larger font (20 -> 26)
             btn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
             btn.textBlock!.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
             btn.textBlock!.paddingLeft = "10px";
