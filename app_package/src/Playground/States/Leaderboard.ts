@@ -93,6 +93,32 @@ export class Leaderboard extends State {
               else if (alias.id) n = `Player ${alias.id}`;
               else n = "Unknown";
           }
+
+          // Fix: Ensure current player's name is displayed correctly (override old alias if needed)
+          const actor = playService.getActor();
+          if (actor) {
+             let myIdentity = "";
+             // Match PlayService.getIdentity() logic
+             if (actor.userId) myIdentity = String(actor.userId);
+             else if (actor.properties && (actor.properties as any).userId) myIdentity = String((actor.properties as any).userId);
+             else myIdentity = playService.getGuestIdentity();
+
+             const entryId = entry?.playerIdentifier || alias?.identifier;
+             
+             // DEBUG LOG for Leaderboard Identity Match
+             if (entries.indexOf(entry) < 3) { // Only log top 3 to avoid spam
+                console.log(`[Leaderboard] Checking match: EntryId=${entryId}, MyId=${myIdentity}, Name=${n}, ActorName=${actor.name}`);
+                // console.log("Entry:", JSON.stringify(entry));
+             }
+
+             if (myIdentity && entryId && String(entryId) === String(myIdentity)) {
+                 if (actor.name && actor.name !== "Guest") {
+                     console.log(`[Leaderboard] Match Found! Overriding name ${n} -> ${actor.name}`);
+                     n = actor.name;
+                 }
+             }
+          }
+
           const name = new TextBlock("name", n);
           name.color = "white";
           name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -274,6 +300,31 @@ export class Leaderboard extends State {
                               else if (alias.id) n = `Player ${alias.id}`;
                               else n = "Unknown";
                           }
+
+                          // Fix: Ensure current player's name is displayed correctly (override old alias if needed)
+                          const actor = playService.getActor();
+                          if (actor) {
+                             let myIdentity = "";
+                             // Match PlayService.getIdentity() logic
+                             if (actor.userId) myIdentity = String(actor.userId);
+                             else if (actor.properties && (actor.properties as any).userId) myIdentity = String((actor.properties as any).userId);
+                             else myIdentity = playService.getGuestIdentity();
+
+                             const entryId = entry?.playerIdentifier || alias?.identifier;
+                             
+                             // DEBUG LOG for Leaderboard Identity Match
+                             if (data.entries.indexOf(entry) < 3) { // Only log top 3 to avoid spam
+                                console.log(`[Leaderboard] Checking match (Fallback): EntryId=${entryId}, MyId=${myIdentity}, Name=${n}, ActorName=${actor.name}`);
+                             }
+
+                             if (myIdentity && entryId && String(entryId) === String(myIdentity)) {
+                                 if (actor.name && actor.name !== "Guest") {
+                                     console.log(`[Leaderboard] Match Found (Fallback)! Overriding name ${n} -> ${actor.name}`);
+                                     n = actor.name;
+                                 }
+                             }
+                          }
+
                           const name = new TextBlock("name", n);
                           name.color = "white";
                           name.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
