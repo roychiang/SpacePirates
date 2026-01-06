@@ -30,12 +30,14 @@ export class Credits extends State {
             grid.addControl(creditBlock, 0, 1);
     
             var textBlock = new TextBlock();
-            textBlock.text = "This demo was made by some members of the Babylon.js core team, @PatrickCRyan, @skaven_, and @DarraghBurke_, " + 
+            textBlock.text = "This is a remix project of Space Pirates from origial celebration release of Babylon.js 5.0. \n\n" + 
+            "\n\nHere is the credits of original demo: \n\n" +
+            "This demo was made by some members of the Babylon.js core team, @PatrickCRyan, @skaven_, and @DarraghBurke_, " + 
             "to celebrate the release of Babylon.js 5.0.\n\n" + 
             "The mission of our Babylon.js team is to create one of the most powerful, beautiful, " + 
             "and simple web rendering engines in the world. Our passion is to make it completely open and free for everyone. As you may have guessed, " + 
             "Babylon.js was named with a deep love and admiration of one of the greatest sci-fi shows of all time.\n\n" + 
-            "To get  the code of this demo on: https://github.com/BabylonJS/SpacePirates \n" + 
+            "To get  the code of original demo: https://github.com/BabylonJS/SpacePirates \n" + 
             "To learn about Babylon.js: https://doc.babylonjs.com \n" + 
             "To connect with the community: https://forum.babylonjs.com";
             textBlock.textWrapping = true;
@@ -76,7 +78,9 @@ export class Credits extends State {
             grid.addControl(textBlock, 0, 0);
     
             var creditText = new TextBlock();
-            creditText.text = "This demo was made by some members of the Babylon.js core team, @PatrickCRyan, @skaven_, and @DarraghBurke_, " + 
+            creditText.text = "This is a remix project of Space Pirates from origial celebration release of Babylon.js 5.0. \n\n" + 
+            "\n\nHere is the credits of original demo: \n\n" +
+            "This demo was made by some members of the Babylon.js core team, @PatrickCRyan, @skaven_, and @DarraghBurke_, " + 
             "to celebrate the release of Babylon.js 5.0.\n\n" + 
             "The mission of our Babylon.js team is to create one of the most powerful, beautiful, " + 
             "and simple web rendering engines in the world. Our passion is to make it completely open and free for everyone. As you may have guessed, " + 

@@ -21,8 +21,10 @@ export class Matchmaking extends State {
   private onConnected = async () => { await this.ensureActor(); /* this.refreshRooms() removed to avoid overwriting event data */ }
   private onRoomListUpdated = (payload: any) => { const rooms = (payload && payload.rooms) ? payload.rooms : []; this.refreshRooms(rooms) }
   public pvpMode: boolean = false // Track whether PvP or Co-op mode is selected
+  private _isActionProcessing: boolean = false;
 
   public enter() {
+    this._isActionProcessing = false;
     super.enter()
     if (!this._adt) return
     const adt = this._adt
@@ -147,98 +149,116 @@ export class Matchmaking extends State {
     this.joinBtn.isEnabled = false
     const cancelBtn = GuiFramework.addButton("Cancel", panel)
     createBtn.onPointerDownObservable.add(async () => {
-      let name = "Guest_" + Math.floor(Math.random() * 1000)
-      let url = ""
-      let sessionId = Math.random().toString(36).slice(2)
-
-      // Use existing guest identity if available to ensure consistency with Main menu
-      const existingActor = playService.getActor();
-      if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
-          name = existingActor.name;
-          sessionId = existingActor.session_id;
-      }
-
+      if (this._isActionProcessing) return;
+      this._isActionProcessing = true;
       try {
-        const token = await authService.getToken()
-        if (token) {
-          avatarService.init(token)
-          name = await authService.getDisplayName(token)
-          const profile = await avatarService.getProfile()
-          url = avatarService.getHeadIconUrlOrDefault(profile)
-          sessionId = await authService.getAccountId() || sessionId
-        }
-      } catch (e) {
-        console.warn("[UI] Auth failed, using mock", e)
-      }
+        let name = "Guest_" + Math.floor(Math.random() * 1000)
+        let url = ""
+        let sessionId = Math.random().toString(36).slice(2)
+        let userId: string | undefined = undefined;
 
-      console.log("[UI] create room start", { name, sessionId, pvpMode: this.pvpMode })
-      await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
-      const roomProperties = {
-        owner: name,
-        gameId: "SpacePirates",
-        game_mode: this.pvpMode ? "pvp" : "coop"
-      };
-      console.log("[UI] Creating room with properties:", JSON.stringify(roomProperties));
-      const res = await playService.createRoom({
-        name,
-        mode: "team",
-        maxPlayers: 4,
-        minPlayers: 2,
-        properties: roomProperties
-      })
-      if (!res.success) {
-        console.log("[UI] create room failed", res.message)
-        // TODO: Show error message to user
-        return
+        // Use existing guest identity if available to ensure consistency with Main menu
+        const existingActor = playService.getActor();
+        if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
+            name = existingActor.name;
+            sessionId = existingActor.session_id;
+        }
+
+        try {
+          const token = await authService.getToken()
+          if (token) {
+            avatarService.init(token)
+            name = await authService.getDisplayName(token)
+            const profile = await avatarService.getProfile()
+            url = avatarService.getHeadIconUrlOrDefault(profile)
+            sessionId = await authService.getAccountId() || sessionId
+            userId = sessionId;
+          }
+        } catch (e) {
+          console.warn("[UI] Auth failed, using mock", e)
+        }
+
+        console.log("[UI] create room start", { name, sessionId, pvpMode: this.pvpMode })
+        await playService.setActor({ session_id: sessionId, userId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
+        const roomProperties = {
+          owner: name,
+          gameId: "SpacePirates",
+          game_mode: this.pvpMode ? "pvp" : "coop"
+        };
+        console.log("[UI] Creating room with properties:", JSON.stringify(roomProperties));
+        const res = await playService.createRoom({
+          name,
+          mode: "team",
+          maxPlayers: 4,
+          minPlayers: 2,
+          properties: roomProperties
+        })
+        if (!res.success) {
+          console.log("[UI] create room failed", res.message)
+          // TODO: Show error message to user
+          return
+        }
+        await playService.ensureActorPresentInRoom()
+        console.log("[UI] create room done")
+        State.setCurrent(States.lobby)
+      } catch (e) {
+        console.error("[UI] create room error", e)
+      } finally {
+        this._isActionProcessing = false;
       }
-      await playService.ensureActorPresentInRoom()
-      console.log("[UI] create room done")
-      State.setCurrent(States.lobby)
     })
     this.joinBtn.onPointerDownObservable.add(async () => {
-      let name = "Guest_" + Math.floor(Math.random() * 1000)
-      let url = ""
-      let sessionId = Math.random().toString(36).slice(2)
-
-      // Use existing guest identity if available to ensure consistency with Main menu
-      const existingActor = playService.getActor();
-      if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
-          name = existingActor.name;
-          sessionId = existingActor.session_id;
-      }
-
+      if (this._isActionProcessing) return;
+      this._isActionProcessing = true;
       try {
-        const token = await authService.getToken()
-        if (token) {
-          avatarService.init(token)
-          name = await authService.getDisplayName(token)
-          const profile = await avatarService.getProfile()
-          url = avatarService.getHeadIconUrlOrDefault(profile)
-          sessionId = await authService.getAccountId() || sessionId
-        }
-      } catch (e) {
-        console.warn("[UI] Auth failed, using mock", e)
-      }
+        let name = "Guest_" + Math.floor(Math.random() * 1000)
+        let url = ""
+        let sessionId = Math.random().toString(36).slice(2)
 
-      await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
-      const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
-      const target = (this.listedRooms || []).find(r => r.id === rid)
-      const max = target ? ((target.metadata && target.metadata.max_players) || (target.properties && target.properties.max_players) || target.max_players || 4) : 4;
-      if (target && (
-          (Array.isArray(target.actors) && target.actors.length >= max) ||
-          (target.properties && (target.properties.playing || target.properties.game_started))
-         )) {
-        console.log("[UI] join blocked: room full or playing", { id: rid })
-        return
+        // Use existing guest identity if available to ensure consistency with Main menu
+        const existingActor = playService.getActor();
+        if (existingActor && existingActor.name && String(existingActor.name).startsWith("Guest_")) {
+            name = existingActor.name;
+            sessionId = existingActor.session_id;
+        }
+
+        try {
+          const token = await authService.getToken()
+          if (token) {
+            avatarService.init(token)
+            name = await authService.getDisplayName(token)
+            const profile = await avatarService.getProfile()
+            url = avatarService.getHeadIconUrlOrDefault(profile)
+            sessionId = await authService.getAccountId() || sessionId
+          }
+        } catch (e) {
+          console.warn("[UI] Auth failed, using mock", e)
+        }
+
+        await playService.setActor({ session_id: sessionId, name, properties: { ready: 0, headIconUrl: url, displayName: name } })
+        const rid = this.selectedRoomId || (this.roomIdInput ? this.roomIdInput.text : "")
+        const target = (this.listedRooms || []).find(r => r.id === rid)
+        const max = target ? ((target.metadata && target.metadata.max_players) || (target.properties && target.properties.max_players) || target.max_players || 4) : 4;
+        if (target && (
+            (Array.isArray(target.actors) && target.actors.length >= max) ||
+            (target.properties && (target.properties.playing || target.properties.game_started))
+           )) {
+          console.log("[UI] join blocked: room full or playing", { id: rid })
+          return
+        }
+        const res = await playService.joinRoom(rid || "room")
+        if (!res.success) {
+          console.log("[UI] join room failed", res.message)
+          // TODO: Show error message to user
+          return
+        }
+        await playService.ensureActorPresentInRoom()
+        State.setCurrent(States.lobby)
+      } catch (e) {
+        console.error("[UI] join room error", e)
+      } finally {
+        this._isActionProcessing = false;
       }
-      const res = await playService.joinRoom(rid || "room")
-      if (!res.success) {
-        console.log("[UI] join room failed", res.message)
-        // TODO: Show error message to user
-        return
-      }
-      await playService.ensureActorPresentInRoom()
-      State.setCurrent(States.lobby)
     })
     cancelBtn.onPointerDownObservable.add(() => {
       State.setCurrent(States.main)
@@ -256,14 +276,31 @@ export class Matchmaking extends State {
     let url = ""
     let token: string | undefined
 
+    // Check VIVERSE Auth with Retry (similar to Main menu)
+    const checkAuthWithRetry = async (attempts: number = 5, delay: number = 200): Promise<any> => {
+        for (let i = 0; i < attempts; i++) {
+            const info = await authService.checkAuth();
+            if (info) return info;
+            await new Promise(r => setTimeout(r, delay));
+        }
+        return undefined;
+    };
+
     try {
-      const info = await authService.checkAuth()
+      const info = await checkAuthWithRetry()
       token = info ? info.access_token : undefined
       if (token) {
         avatarService.init(token)
         name = await authService.getDisplayName(token)
         const profile = await avatarService.getProfile()
         url = avatarService.getHeadIconUrlOrDefault(profile)
+        const accountId = await authService.getAccountId()
+        await playService.setActor({
+            session_id: accountId || "User",
+            userId: accountId,
+            name: name,
+            properties: { headIconUrl: url, displayName: name }
+        })
       }
     } catch (e) {
       console.warn("[UI] Auth failed (expected on localhost), using mock identity", e)

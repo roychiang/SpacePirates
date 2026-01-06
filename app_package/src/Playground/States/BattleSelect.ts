@@ -7,6 +7,7 @@ import { States } from "./States";
 import { Assets } from "../Assets";
 import { GuiFramework } from "../GuiFramework";
 import { InputManager } from "../Inputs/Input";
+import { playService } from "../../Viverse/Viverse";
 
 export class BattleSelect extends State {
 
@@ -105,6 +106,13 @@ export class BattleSelect extends State {
             });
     
             this._adt.addControl(grid);
+            
+            // Add Player Avatar (Single Player Review Request)
+            const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+            const actor = playService.getActor();
+            const name = actor?.name || playService.getGuestIdentity();
+            const url = (actor?.properties as any)?.headIconUrl || "";
+            GuiFramework.updateTopLeftAvatar(name, url, this._adt);
 
         } else {
             let grid = new Grid();
@@ -175,6 +183,13 @@ export class BattleSelect extends State {
             grid.addControl(panel, 2, 0);
 
             this._adt.addControl(grid);
+
+            // Add Player Avatar (Single Player Review Request)
+            const avatarGrid = GuiFramework.ensureGlobalTopLeftAvatar(this._adt);
+            const actor = playService.getActor();
+            const name = actor?.name || playService.getGuestIdentity();
+            const url = (actor?.properties as any)?.headIconUrl || "";
+            GuiFramework.updateTopLeftAvatar(name, url, this._adt);
 
         }
     }

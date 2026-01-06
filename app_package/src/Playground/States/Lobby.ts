@@ -363,6 +363,13 @@ export class Lobby extends State {
   }
 
   private async loadStatus() {
+    const actor = playService.getActor()
+    if (actor && actor.name) {
+        const url = (actor.properties as any)?.headIconUrl || ""
+        GuiFramework.updateTopLeftAvatar(actor.name, url)
+        return
+    }
+
     const info = await authService.checkAuth()
     const token = info ? info.access_token : undefined
     avatarService.init(token)

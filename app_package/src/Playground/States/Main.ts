@@ -673,9 +673,21 @@ export class Main extends State {
         playService.on("globalChatReceived", this.onChatReceived);
 
         // Check VIVERSE Auth
-        authService.checkAuth().then(async (info) => {
+        const checkAuthWithRetry = async (attempts: number = 10, delay: number = 500): Promise<any> => {
+            for (let i = 0; i < attempts; i++) {
+                const info = await authService.checkAuth();
+                if (info) return info;
+                await new Promise(r => setTimeout(r, delay));
+            }
+            return undefined;
+        };
+
+        checkAuthWithRetry().then(async (info) => {
             if (info) {
                 try {
+                    if (info.access_token) {
+                        avatarService.init(info.access_token);
+                    }
                     const profile = await avatarService.getProfile();
                     GuiFramework.updateTopLeftAvatar(profile.name || "Player", profile.activeAvatar?.headIconUrl, this._adt || undefined);
                     
@@ -683,6 +695,7 @@ export class Main extends State {
                     const accountId = await authService.getAccountId();
                     playService.setActor({
                         session_id: accountId || (info as any).account_id || "User",
+                        userId: accountId || (info as any).account_id,
                         name: profile.name || "Player",
                         properties: { headIconUrl: profile.activeAvatar?.headIconUrl || "" }
                     });

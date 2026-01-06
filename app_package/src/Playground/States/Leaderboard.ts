@@ -60,7 +60,7 @@ export class Leaderboard extends State {
       entriesPanel.clearControls();
 
       const data = message?.data;
-      const entries = data && Array.isArray(data.entries) ? data.entries : [];
+      const entries = (data && Array.isArray(data.entries) ? data.entries : []).slice(0, 25);
       if (entries.length > 0) {
         entries.forEach((entry: any) => {
           const row = new Grid();
@@ -243,7 +243,7 @@ export class Leaderboard extends State {
               TaloClient.getLeaderboard(internalName).then((data: any) => {
                   if (!this._isActive) return;
                   if (data && data.entries) {
-                      data.entries.forEach((entry: any) => {
+                  data.entries.slice(0, 25).forEach((entry: any) => {
                           const row = new Grid(); // Use Grid for better alignment
                           row.height = "30px";
                           row.width = "100%";
