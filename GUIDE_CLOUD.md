@@ -6,14 +6,14 @@ This guide covers deploying the Game Server to **Hetzner** and the Client for **
 
 ### 1. Prepare Server
 - **Server IP**: `46.224.54.46` (Example)
-- **Domain**: `spacepirates.duckdns.org`
-- **SSH Access**: Ensure you can `ssh root@46.224.54.46`.
+- **Domain**: `www.spacepirates.app` (Previously spacepirates.duckdns.org)
+- **SSH Access**: Ensure you can `ssh root@<server-ip>`.
 
 ### 2. Configure Project
 1.  **Update Config**:
     - Ensure `app_package/src/Config.ts` has:
       ```typescript
-      public static readonly PROD_ENDPOINT = "wss://spacepirates.duckdns.org";
+      public static readonly PROD_ENDPOINT = "wss://www.spacepirates.app";
       ```
 2.  **Environment Variables**:
     - Create a local file named `server_env` (do not commit this) with:
@@ -21,24 +21,30 @@ This guide covers deploying the Game Server to **Hetzner** and the Client for **
       PORT=2567
       MONITOR_TOKEN=admin-secret
       TALO_ACCESS_KEY=your-actual-talo-key
+      VIVERSE_CLIENT_ID=...
+      VIVERSE_CLIENT_SECRET=...
+      SPACEPIRATES_DOMAIN=www.spacepirates.app
       ```
 
 ### 3. Deploy Files
 1.  **Copy Files** to Hetzner:
     ```bash
-    scp -r server app_package package.json DEPLOYMENT.md root@46.224.54.46:/opt/SpacePirates/
+    # Copy the entire project (excluding node_modules etc via .gitignore logic usually, but here we copy explicit folders)
+    # We recommend using git on the server, but for manual copy:
+    scp -r server test_package app_package package.json GUIDE_CLOUD.md root@<server-ip>:/opt/SpacePirates/
     ```
 2.  **Copy Secrets**:
     ```bash
-    scp server_env root@46.224.54.46:/opt/SpacePirates/server/.env
+    scp server_env root@<server-ip>:/opt/SpacePirates/server/.env
     ```
 
 ### 4. Install & Run (On Remote Server)
 1.  **SSH into Server**:
     ```bash
-    ssh root@46.224.54.46
+    ssh root@<server-ip>
     ```
 2.  **Run Setup Script**:
+    This script installs Docker, builds the client, and starts the server.
     ```bash
     # Make sure the script is executable
     chmod +x /opt/SpacePirates/server/deploy/setup_hetzner.sh
@@ -48,43 +54,42 @@ This guide covers deploying the Game Server to **Hetzner** and the Client for **
 3.  **Verify**:
     - Check if Docker containers are running: `docker ps`
     - Check Caddy logs for SSL: `docker compose logs caddy`
-    - Test Endpoint: `curl -I https://spacepirates.duckdns.org/colyseus`
+    - Test Endpoint: `curl -I https://www.spacepirates.app/colyseus`
 
 ---
 
-## Part 2: VIVERSE Client Deployment
+## Part 2: Agent Verification
+
+To verify that the Agent API is discoverable by GPTs:
+
+1.  **Manifest Check**:
+    - Visit `https://www.spacepirates.app/.well-known/agent.json`
+    - It should return a JSON object with `id: "spacepirates"` and `actions`.
+
+2.  **OpenAPI Spec**:
+    - Visit `https://www.spacepirates.app/openapi.yaml`
+    - It should return the API definition.
+
+3.  **GPT Action Test**:
+    - In your GPT configuration, import the OpenAPI spec from URL or text.
+    - Test the `get_state` or `create_session` actions.
+
+---
+
+## Part 3: VIVERSE Client Deployment
 
 VIVERSE usually hosts the client content (WebGL build).
 
 ### 1. Build Client
-1.  On your **Local Machine**:
+1.  On your **Local Machine** (or Server if using Caddy to host):
     ```powershell
-    cd app_package
+    cd test_package
     npm install
     npm run build
     ```
-2.  This creates a `dist/` (or `public/`) folder with `index.html`, `bundle.js`, etc.
+2.  This creates a `../docs` folder with `index.html`, `bundle.js`, etc.
+    - In our Docker setup, this `docs` folder is mounted to Caddy and served at `https://www.spacepirates.app/`.
 
-### 2. Upload to Hosting
-- **Option A: VIVERSE Hosting** (If available): Upload the contents of `dist/` to your VIVERSE Creator Console.
-- **Option B: External Hosting** (GitHub Pages / Netlify):
-    1.  Push the `dist` folder to a gh-pages branch.
-    2.  Or drag-and-drop `dist` folder to Netlify Drop.
-    3.  **Get the URL**: e.g., `https://my-game.netlify.app`.
-
-### 3. Link in VIVERSE
-1.  Go to **VIVERSE Creator Console**.
-2.  Create/Edit your **World**.
-3.  Set the **Game URL** to your hosted client URL (from Step 2).
-
-## Part 3: Verification
-
-1.  **Enter VIVERSE World**: Launch your world in VIVERSE.
-2.  **Check Connection**:
-    - The game should load.
-    - It should connect to `wss://spacepirates.duckdns.org` (Hetzner).
-    - You should not see connection errors in the browser console (F12).
-3.  **Test Gameplay**:
-    - Play a round.
-    - **Verify Leaderboard**: Finish a game and check if your score appears on the Leaderboard.
-    - **Verify Anti-Cheat**: Since the server is handling scoring, if you see the score update, the secure pipeline is working!
+### 2. Verify Client
+- Visit `https://www.spacepirates.app/`
+- It should load the game and connect to the server.

@@ -57,4 +57,12 @@ export class GlobalLobbyRoom extends Room<LobbyState> {
         this.state.players.delete(client.sessionId);
         console.log(`[GlobalLobby] ${client.sessionId} left.`);
     }
+
+    handleRemoteChat(data: any) {
+        this.broadcast("chat", data);
+        return true;
+    }
+
+    onDispose() {
+    }
 }

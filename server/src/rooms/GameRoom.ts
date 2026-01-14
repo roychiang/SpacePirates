@@ -350,6 +350,22 @@ export class GameRoom extends Room<GameState> {
         });
     }
 
+    forceStart() {
+        if (this.state.properties.get("game_started") === "true") return false;
+        
+        this.state.properties.set("game_started", "true");
+        // Update metadata to reflect change
+        this.setMetadata({ ...this.metadata, game_started: true });
+        return true;
+    }
+
+    handleRemoteChat(data: any) {
+        // Broadcast chat message to all clients in this room
+        // Data should include: senderId, name, text, ts
+        this.broadcast("chat", data);
+        return true;
+    }
+
     onJoin(client: Client, options: any) {
         // Check custom limit
         if (this.state.players.size >= this.customMaxPlayers) {

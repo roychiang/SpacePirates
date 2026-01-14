@@ -6,6 +6,8 @@ import { GameState } from "./States/GameState";
 import { GameSession } from "./States/GameSession";
 import { Diorama } from "./States/Diorama";
 import { Main } from "./States/Main";
+import { BattleSelect } from "./States/BattleSelect";
+import { GameDefinition } from "./Game";
 import { Parameters } from './Parameters';
 
 class Playground {
@@ -44,9 +46,73 @@ class Playground {
             GameState.gameSession = new GameSession(assets, scene, canvas, glowLayer);
             Main.diorama = new Diorama(scene, assets, engine, glowLayer);
             States.photoMode.assets = assets;
-            State.setCurrent(States.main);
-            // jump directly in the game
-            //State.setCurrent(States.gameState);
+
+            // Agent Deep Link Handler
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get("mode");
+            const mission = urlParams.get("mission");
+            
+            if (mode === "quick" || mode === "single") {
+                console.log("[Playground] Auto-starting Single Player (Quick Mode)");
+                const startQuickPlay = () => {
+                    const overrideDefinition = new GameDefinition();
+                    overrideDefinition.humanAllies = Parameters.allowSplitScreen ? 2 : 1;
+                    overrideDefinition.aiEnemies = Parameters.enemyCount;
+                    overrideDefinition.aiAllies = Parameters.allyCount;
+                    BattleSelect.gameDefinition = overrideDefinition;
+
+                    // If a specific mission is requested (e.g., &mission=squad)
+                    if (mission && Assets.missions) {
+                        const targetMission = Assets.missions.find((m: any) => m.name.toLowerCase() === mission.toLowerCase());
+                        if (targetMission) {
+                            console.log(`[Playground] Found mission: ${targetMission.name}, starting directly...`);
+                            
+                            const base: GameDefinition = targetMission.gameDefinition as GameDefinition;
+                            const override: Nullable<GameDefinition> = overrideDefinition;
+                            
+                            // Merge logic from BattleSelect.ts
+                            const finalDef: GameDefinition = {
+                                ...base,
+                                humanAllies: override?.humanAllies ?? base.humanAllies,
+                                humanEnemies: override?.humanEnemies ?? base.humanEnemies,
+                                aiAllies: base.aiAllies,
+                                aiEnemies: base.aiEnemies,
+                                seed: base.seed,
+                                asteroidCount: base.asteroidCount,
+                                asteroidRadius: base.asteroidRadius,
+                                humanAlliesLife: base.humanAlliesLife,
+                                humanEnemiesLife: base.humanEnemiesLife,
+                                aiAlliesLife: base.aiAlliesLife,
+                                aiEnemiesLife: base.aiEnemiesLife,
+                                shotDamage: base.shotDamage,
+                                missileDamage: base.missileDamage,
+                                delayedEnd: base.delayedEnd,
+                                enemyBoundaryRadius: base.enemyBoundaryRadius,
+                                humanBoundaryRadius: base.humanBoundaryRadius,
+                            };
+                            
+                            GameState.gameDefinition = finalDef;
+                            State.setCurrent(States.gameState);
+                            return;
+                        } else {
+                            console.warn(`[Playground] Mission '${mission}' not found, falling back to BattleSelect.`);
+                        }
+                    }
+
+                    // Fallback to Mission Select
+                    State.setCurrent(States.battleSelect);
+                };
+
+                if (Assets.loadingComplete) {
+                    startQuickPlay();
+                } else {
+                    Assets.onLoadingCompleteObservable.addOnce(() => {
+                        startQuickPlay();
+                    });
+                }
+            } else {
+                State.setCurrent(States.main);
+            }
         },
         (assets) => {
             if (Main.playButton) {

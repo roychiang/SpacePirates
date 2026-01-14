@@ -7,5 +7,7 @@
     }
     reverse_proxy @ws server:2567
     reverse_proxy /colyseus server:2567
+    reverse_proxy /api/* server:2567
+    reverse_proxy /.well-known/* server:2567
 }
 

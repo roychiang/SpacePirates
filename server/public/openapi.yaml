@@ -1,0 +1,580 @@
+openapi: 3.0.3
+info:
+  title: SpacePirates Agentic API
+  version: "0.1.0"
+  description: |
+    Agent Manifest + Actions API for SpacePirates.
+    Designed for agentic workflows: discover -> deep link -> call actions -> verify via get_state.
+servers:
+  - url: https://www.spacepirates.app
+
+tags:
+  - name: Manifest
+  - name: Actions
+
+paths:
+  /.well-known/agent.json:
+    get:
+      tags: [Manifest]
+      summary: Agent Manifest (World/App Card)
+      operationId: getAgentManifest
+      responses:
+        "200":
+          description: Manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentManifest"
+
+  /.well-known/viverse-agent.json:
+    get:
+      tags: [Manifest]
+      summary: VIVERSE-specific Agent Manifest alias
+      operationId: getViverseAgentManifest
+      responses:
+        "200":
+          description: Manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentManifest"
+
+  /api/actions/create_session:
+    post:
+      tags: [Actions]
+      summary: Create a new game session (room)
+      operationId: createSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema: { type: string }
+          description: Idempotency key to prevent duplicate sessions on retries.
+        - $ref: "#/components/parameters/XAgentId"
+        - $ref: "#/components/parameters/XInvocationId"
+        - $ref: "#/components/parameters/XClientTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Action response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse_CreateSession"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /api/actions/join_session:
+    post:
+      tags: [Actions]
+      summary: Join an existing session (player or spectator)
+      operationId: joinSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XAgentId"
+        - $ref: "#/components/parameters/XInvocationId"
+        - $ref: "#/components/parameters/XClientTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinSessionRequest"
+      responses:
+        "200":
+          description: Action response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse_JoinSession"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /api/actions/start:
+    post:
+      tags: [Actions]
+      summary: Start the session (host-only)
+      operationId: startSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XAgentId"
+        - $ref: "#/components/parameters/XInvocationId"
+        - $ref: "#/components/parameters/XClientTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSessionRequest"
+      responses:
+        "200":
+          description: Action response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse_Start"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /api/actions/get_state:
+    post:
+      tags: [Actions]
+      summary: Get authoritative session state (agent verification)
+      operationId: getState
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XAgentId"
+        - $ref: "#/components/parameters/XInvocationId"
+        - $ref: "#/components/parameters/XClientTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetStateRequest"
+      responses:
+        "200":
+          description: Action response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse_GetState"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /api/actions/send_chat:
+    post:
+      tags: [Actions]
+      summary: Send a chat message to a session
+      operationId: sendChat
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XAgentId"
+        - $ref: "#/components/parameters/XInvocationId"
+        - $ref: "#/components/parameters/XClientTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendChatRequest"
+      responses:
+        "200":
+          description: Action response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse_SendChat"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    XAgentId:
+      in: header
+      name: X-Agent-Id
+      required: false
+      schema: { type: string, maxLength: 64 }
+      description: Optional attribution id (e.g., chatgpt, gemini).
+    XInvocationId:
+      in: header
+      name: X-Invocation-Id
+      required: false
+      schema: { type: string, maxLength: 128 }
+      description: Tool call / correlation id for tracing.
+    XClientTraceId:
+      in: header
+      name: X-Client-Trace-Id
+      required: false
+      schema: { type: string, maxLength: 128 }
+      description: Client-side trace id.
+
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error429:
+      description: Rate Limited
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+    Error500:
+      description: Server Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActionErrorResponse" }
+
+  schemas:
+    # ---------- Manifest ----------
+    AgentManifest:
+      type: object
+      required: [id, title, version, updated_at, type, tags, devices, entry, actions]
+      properties:
+        id: { type: string, example: "spacepirates" }
+        title: { type: string, example: "SpacePirates" }
+        version: { type: string, example: "0.1.0" }
+        updated_at: { type: string, format: date-time }
+        type: { type: string, example: "webxr_game" }
+        tags:
+          type: array
+          items: { type: string }
+          example: ["game", "3d", "multiplayer", "co-op"]
+        devices:
+          type: array
+          items: { type: string, enum: [desktop, mobile, vr] }
+        safety:
+          type: object
+          properties:
+            rating: { type: string, example: "E10+" }
+        entry:
+          type: object
+          required: [url, deep_links]
+          properties:
+            url: { type: string, format: uri, example: "https://www.spacepirates.app/" }
+            deep_links:
+              type: array
+              items:
+                $ref: "#/components/schemas/DeepLink"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ManifestAction"
+        capabilities:
+          type: object
+          properties:
+            multiplayer: { type: boolean, example: true }
+            spectator: { type: boolean, example: true }
+
+    DeepLink:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: "join_room" }
+        url: { type: string, format: uri, nullable: true }
+        url_template: { type: string, nullable: true }
+
+    ManifestAction:
+      type: object
+      required: [name, method, path]
+      properties:
+        name: { type: string, example: "create_session" }
+        method: { type: string, enum: [GET, POST] }
+        path: { type: string, example: "/api/actions/create_session" }
+        auth:
+          type: object
+          properties:
+            required: { type: boolean, default: true }
+            scopes:
+              type: array
+              items: { type: string }
+              example: ["sessions:write"]
+
+    # ---------- Common envelopes ----------
+    ActionStatus:
+      type: string
+      enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION, ERROR]
+
+    ActionError:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_ARGUMENT
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - INSUFFICIENT_SCOPE
+            - NOT_FOUND
+            - CONFLICT
+            - SESSION_FULL
+            - SESSION_NOT_JOINABLE
+            - SESSION_NOT_STARTABLE
+            - RATE_LIMITED
+            - MESSAGE_TOO_LONG
+            - SERVER_ERROR
+        message: { type: string }
+        retryable: { type: boolean }
+        retry_after_ms: { type: integer, nullable: true }
+        details:
+          type: object
+          additionalProperties: true
+
+    ActionNext:
+      type: object
+      properties:
+        open_url:
+          type: string
+          format: uri
+          nullable: true
+        instruction:
+          type: string
+          nullable: true
+
+    ActionErrorResponse:
+      type: object
+      required: [status, error]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        error: { $ref: "#/components/schemas/ActionError" }
+        next: { $ref: "#/components/schemas/ActionNext" }
+
+    # ---------- Requests ----------
+    CreateSessionRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [co-op, pvp, quick]
+          description: quick may create a session and set it as quick play.
+        max_players:
+          type: integer
+          minimum: 1
+          maximum: 16
+          default: 4
+        min_players_to_start:
+          type: integer
+          minimum: 1
+          maximum: 16
+          default: 2
+        visibility:
+          type: string
+          enum: [public, unlisted, private]
+          default: unlisted
+        metadata:
+          type: object
+          additionalProperties: true
+
+    JoinSessionRequest:
+      type: object
+      required: [room_id, role]
+      properties:
+        room_id: { type: string, minLength: 1, maxLength: 64 }
+        role:
+          type: string
+          enum: [player, spectator]
+        display_name:
+          type: string
+          maxLength: 32
+          nullable: true
+
+    StartSessionRequest:
+      type: object
+      required: [room_id]
+      properties:
+        room_id: { type: string, minLength: 1, maxLength: 64 }
+
+    GetStateRequest:
+      type: object
+      required: [room_id]
+      properties:
+        room_id: { type: string, minLength: 1, maxLength: 64 }
+
+    SendChatRequest:
+      type: object
+      required: [room_id, message]
+      properties:
+        room_id: { type: string, minLength: 1, maxLength: 64 }
+        message:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    # ---------- Session state ----------
+    SessionPhase:
+      type: string
+      enum: [LOBBY, READY, IN_GAME, ENDED]
+
+    PlayerInfo:
+      type: object
+      required: [player_id, role, connected]
+      properties:
+        player_id: { type: string }
+        role: { type: string, enum: [host, player, spectator] }
+        display_name: { type: string, nullable: true }
+        connected: { type: boolean }
+
+    SessionState:
+      type: object
+      required: [room_id, phase, max_players, min_players_to_start, players, updated_at]
+      properties:
+        room_id: { type: string }
+        phase: { $ref: "#/components/schemas/SessionPhase" }
+        max_players: { type: integer }
+        min_players_to_start: { type: integer }
+        startable: { type: boolean, description: "True when phase is READY and host can start." }
+        players:
+          type: array
+          items: { $ref: "#/components/schemas/PlayerInfo" }
+        score:
+          type: object
+          additionalProperties: true
+          nullable: true
+        updated_at: { type: string, format: date-time }
+
+    # ---------- Action responses ----------
+    ActionResponse_CreateSession:
+      type: object
+      required: [status, result]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        result:
+          type: object
+          required: [room_id]
+          properties:
+            room_id: { type: string }
+            host_player_id: { type: string }
+        next:
+          $ref: "#/components/schemas/ActionNext"
+        error:
+          $ref: "#/components/schemas/ActionError"
+
+    ActionResponse_JoinSession:
+      type: object
+      required: [status, result]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        result:
+          type: object
+          required: [room_id, player_id, role]
+          properties:
+            room_id: { type: string }
+            player_id: { type: string }
+            role: { type: string, enum: [player, spectator] }
+        next: { $ref: "#/components/schemas/ActionNext" }
+        error: { $ref: "#/components/schemas/ActionError" }
+
+    ActionResponse_Start:
+      type: object
+      required: [status, result]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        result:
+          type: object
+          required: [room_id, phase]
+          properties:
+            room_id: { type: string }
+            phase: { $ref: "#/components/schemas/SessionPhase" }
+        next: { $ref: "#/components/schemas/ActionNext" }
+        error: { $ref: "#/components/schemas/ActionError" }
+
+    ActionResponse_GetState:
+      type: object
+      required: [status, result]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        result:
+          type: object
+          required: [state]
+          properties:
+            state: { $ref: "#/components/schemas/SessionState" }
+        next: { $ref: "#/components/schemas/ActionNext" }
+        error: { $ref: "#/components/schemas/ActionError" }
+
+    ActionResponse_SendChat:
+      type: object
+      required: [status, result]
+      properties:
+        status: { $ref: "#/components/schemas/ActionStatus" }
+        result:
+          type: object
+          required: [room_id, accepted]
+          properties:
+            room_id: { type: string }
+            accepted: { type: boolean }
+        next: { $ref: "#/components/schemas/ActionNext" }
+        error: { $ref: "#/components/schemas/ActionError" }

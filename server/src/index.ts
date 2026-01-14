@@ -4,6 +4,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { createServer } from "http";
 import express from "express";
 import cors from "cors";
+import path from "path";
 import { monitor } from "@colyseus/monitor";
 import { GameRoom } from "./rooms/GameRoom";
 import { LobbyRoom } from "colyseus";
@@ -34,6 +35,7 @@ const app = express();
 const allowed = (process.env.ALLOWED_ORIGINS || "*").split(",").map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: (origin, cb) => { if (!origin || allowed.includes("*") || allowed.includes(origin)) { cb(null, true) } else { cb(null, false) } }, credentials: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
 
 const httpServer: HttpServer = createServer(app);
 const transport = new WebSocketTransport({
@@ -101,10 +103,16 @@ gameServer.define("lobby", LobbyRoom);
 gameServer.define("global_lobby", GlobalLobbyRoom);
 
 import { TaloService } from "./services/TaloService";
+import { actionsRouter } from "./api/actions";
 
 // Register GameRoom
 gameServer.define("game_room", GameRoom)
     .enableRealtimeListing();
+
+app.use("/api/actions", actionsRouter);
+
+// Serve static files from public (e.g. .well-known/agent.json, openapi.yaml)
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.get("/api/leaderboard/:alias", async (req, res) => {
     const alias = req.params.alias;

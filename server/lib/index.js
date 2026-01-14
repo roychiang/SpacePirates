@@ -19,6 +19,7 @@ const ws_transport_1 = require("@colyseus/ws-transport");
 const http_1 = require("http");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const path_1 = __importDefault(require("path"));
 const monitor_1 = require("@colyseus/monitor");
 const GameRoom_1 = require("./rooms/GameRoom");
 const colyseus_2 = require("colyseus");
@@ -54,6 +55,7 @@ app.use((0, cors_1.default)({ origin: (origin, cb) => { if (!origin || allowed.i
         cb(null, false);
     } }, credentials: true }));
 app.use(express_1.default.json());
+app.use(express_1.default.static(path_1.default.join(__dirname, "../public")));
 const httpServer = (0, http_1.createServer)(app);
 const transport = new ws_transport_1.WebSocketTransport({
     perMessageDeflate: false,
@@ -118,9 +120,11 @@ httpServer.on("upgrade", (req, socket, head) => {
 gameServer.define("lobby", colyseus_2.LobbyRoom);
 gameServer.define("global_lobby", GlobalLobbyRoom_1.GlobalLobbyRoom);
 const TaloService_1 = require("./services/TaloService");
+const actions_1 = require("./api/actions");
 // Register GameRoom
 gameServer.define("game_room", GameRoom_1.GameRoom)
     .enableRealtimeListing();
+app.use("/api/actions", actions_1.actionsRouter);
 app.get("/api/leaderboard/:alias", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const alias = req.params.alias;
     try {

@@ -90,6 +90,12 @@ class GlobalLobbyRoom extends colyseus_1.Room {
         this.state.players.delete(client.sessionId);
         console.log(`[GlobalLobby] ${client.sessionId} left.`);
     }
+    handleRemoteChat(data) {
+        this.broadcast("chat", data);
+        return true;
+    }
+    onDispose() {
+    }
 }
 exports.GlobalLobbyRoom = GlobalLobbyRoom;
 //# sourceMappingURL=GlobalLobbyRoom.js.map

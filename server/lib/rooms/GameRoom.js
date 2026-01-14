@@ -403,6 +403,20 @@ class GameRoom extends colyseus_1.Room {
         });
         this.setMetadata(Object.assign(Object.assign({}, this.metadata), { playerCount: this.state.players.size, headIcons: JSON.stringify(headIcons) }));
     }
+    forceStart() {
+        if (this.state.properties.get("game_started") === "true")
+            return false;
+        this.state.properties.set("game_started", "true");
+        // Update metadata to reflect change
+        this.setMetadata(Object.assign(Object.assign({}, this.metadata), { game_started: true }));
+        return true;
+    }
+    handleRemoteChat(data) {
+        // Broadcast chat message to all clients in this room
+        // Data should include: senderId, name, text, ts
+        this.broadcast("chat", data);
+        return true;
+    }
     onJoin(client, options) {
         var _a, _b, _c, _d, _e;
         // Check custom limit

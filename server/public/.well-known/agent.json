@@ -1,0 +1,45 @@
+{
+  "id": "spacepirates",
+  "title": "SpacePirates",
+  "version": "0.1.0",
+  "updated_at": "2026-01-14T12:00:00Z",
+  "type": "webxr_game",
+  "tags": ["game", "3d", "multiplayer", "co-op"],
+  "devices": ["desktop", "mobile", "vr"],
+  "safety": {
+    "rating": "E10+"
+  },
+  "entry": {
+    "url": "https://www.spacepirates.app/",
+    "deep_links": [
+      {
+        "name": "join_room",
+        "url_template": "https://www.spacepirates.app/?room={room_id}"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "name": "create_session",
+      "method": "POST",
+      "path": "/api/actions/create_session",
+      "auth": { "required": true }
+    },
+    {
+      "name": "get_state",
+      "method": "POST",
+      "path": "/api/actions/get_state",
+      "auth": { "required": true }
+    },
+    {
+      "name": "send_chat",
+      "method": "POST",
+      "path": "/api/actions/send_chat",
+      "auth": { "required": true }
+    }
+  ],
+  "capabilities": {
+    "multiplayer": true,
+    "spectator": true
+  }
+}
