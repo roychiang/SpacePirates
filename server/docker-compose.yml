@@ -4,6 +4,13 @@ services:
     build: .
     expose:
       - "2567"
+    environment:
+      - SP_DEV_API_KEY
+      - TALO_ACCESS_KEY
+      - SP_JWT_PUBLIC_KEY
+      - SP_JWT_PRIVATE_KEY
+      - VIVERSE_CLIENT_ID
+      - VIVERSE_CLIENT_SECRET
     restart: always
   caddy:
     image: caddy:2

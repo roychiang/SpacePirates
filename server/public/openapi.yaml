@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: SpacePirates Agentic API
   version: "0.1.0"
@@ -46,15 +46,6 @@ paths:
       operationId: createSession
       security:
         - bearerAuth: []
-      parameters:
-        - in: header
-          name: Idempotency-Key
-          required: false
-          schema: { type: string }
-          description: Idempotency key to prevent duplicate sessions on retries.
-        - $ref: "#/components/parameters/XAgentId"
-        - $ref: "#/components/parameters/XInvocationId"
-        - $ref: "#/components/parameters/XClientTraceId"
       requestBody:
         required: true
         content:
@@ -74,6 +65,8 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
+        "409":
+          $ref: "#/components/responses/Error409"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -86,10 +79,6 @@ paths:
       operationId: joinSession
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XAgentId"
-        - $ref: "#/components/parameters/XInvocationId"
-        - $ref: "#/components/parameters/XClientTraceId"
       requestBody:
         required: true
         content:
@@ -125,10 +114,6 @@ paths:
       operationId: startSession
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XAgentId"
-        - $ref: "#/components/parameters/XInvocationId"
-        - $ref: "#/components/parameters/XClientTraceId"
       requestBody:
         required: true
         content:
@@ -164,10 +149,6 @@ paths:
       operationId: getState
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XAgentId"
-        - $ref: "#/components/parameters/XInvocationId"
-        - $ref: "#/components/parameters/XClientTraceId"
       requestBody:
         required: true
         content:
@@ -201,10 +182,6 @@ paths:
       operationId: sendChat
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XAgentId"
-        - $ref: "#/components/parameters/XInvocationId"
-        - $ref: "#/components/parameters/XClientTraceId"
       requestBody:
         required: true
         content:
@@ -240,25 +217,7 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
-  parameters:
-    XAgentId:
-      in: header
-      name: X-Agent-Id
-      required: false
-      schema: { type: string, maxLength: 64 }
-      description: Optional attribution id (e.g., chatgpt, gemini).
-    XInvocationId:
-      in: header
-      name: X-Invocation-Id
-      required: false
-      schema: { type: string, maxLength: 128 }
-      description: Tool call / correlation id for tracing.
-    XClientTraceId:
-      in: header
-      name: X-Client-Trace-Id
-      required: false
-      schema: { type: string, maxLength: 128 }
-      description: Client-side trace id.
+
 
   responses:
     Error400:
@@ -343,8 +302,8 @@ components:
       required: [name]
       properties:
         name: { type: string, example: "join_room" }
-        url: { type: string, format: uri, nullable: true }
-        url_template: { type: string, nullable: true }
+        url: { type: ["string", "null"], format: uri }
+        url_template: { type: ["string", "null"] }
 
     ManifestAction:
       type: object
@@ -388,7 +347,7 @@ components:
             - SERVER_ERROR
         message: { type: string }
         retryable: { type: boolean }
-        retry_after_ms: { type: integer, nullable: true }
+        retry_after_ms: { type: ["integer", "null"] }
         details:
           type: object
           additionalProperties: true
@@ -397,12 +356,10 @@ components:
       type: object
       properties:
         open_url:
-          type: string
+          type: ["string", "null"]
           format: uri
-          nullable: true
         instruction:
-          type: string
-          nullable: true
+          type: ["string", "null"]
 
     ActionErrorResponse:
       type: object
@@ -419,8 +376,8 @@ components:
       properties:
         mode:
           type: string
-          enum: [co-op, pvp, quick]
-          description: quick may create a session and set it as quick play.
+          enum: [co-op, pvp, quick, quick_solo, quick_squad, quick_battle]
+          description: quick modes (solo, squad, battle) automatically configure room properties.
         max_players:
           type: integer
           minimum: 1
@@ -448,9 +405,8 @@ components:
           type: string
           enum: [player, spectator]
         display_name:
-          type: string
+          type: ["string", "null"]
           maxLength: 32
-          nullable: true
 
     StartSessionRequest:
       type: object
@@ -485,7 +441,7 @@ components:
       properties:
         player_id: { type: string }
         role: { type: string, enum: [host, player, spectator] }
-        display_name: { type: string, nullable: true }
+        display_name: { type: ["string", "null"] }
         connected: { type: boolean }
 
     SessionState:
@@ -501,80 +457,142 @@ components:
           type: array
           items: { $ref: "#/components/schemas/PlayerInfo" }
         score:
-          type: object
+          type: ["object", "null"]
           additionalProperties: true
-          nullable: true
         updated_at: { type: string, format: date-time }
 
     # ---------- Action responses ----------
     ActionResponse_CreateSession:
-      type: object
-      required: [status, result]
-      properties:
-        status: { $ref: "#/components/schemas/ActionStatus" }
-        result:
-          type: object
-          required: [room_id]
+      oneOf:
+        - type: object
+          required: [status, result]
           properties:
-            room_id: { type: string }
-            host_player_id: { type: string }
-        next:
-          $ref: "#/components/schemas/ActionNext"
-        error:
-          $ref: "#/components/schemas/ActionError"
+            status:
+              type: string
+              enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION]
+            result:
+              type: object
+              required: [room_id]
+              properties:
+                room_id: { type: string }
+                host_player_id: { type: string }
+            next:
+              $ref: "#/components/schemas/ActionNext"
+        - type: object
+          required: [status, error]
+          properties:
+            status:
+              type: string
+              enum: [ERROR]
+            error:
+              $ref: "#/components/schemas/ActionError"
+            next:
+              $ref: "#/components/schemas/ActionNext"
 
     ActionResponse_JoinSession:
-      type: object
-      required: [status, result]
-      properties:
-        status: { $ref: "#/components/schemas/ActionStatus" }
-        result:
-          type: object
-          required: [room_id, player_id, role]
+      oneOf:
+        - type: object
+          required: [status, result]
           properties:
-            room_id: { type: string }
-            player_id: { type: string }
-            role: { type: string, enum: [player, spectator] }
-        next: { $ref: "#/components/schemas/ActionNext" }
-        error: { $ref: "#/components/schemas/ActionError" }
+            status:
+              type: string
+              enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION]
+            result:
+              type: object
+              required: [room_id, player_id, role]
+              properties:
+                room_id: { type: string }
+                player_id: { type: string }
+                role: { type: string, enum: [player, spectator] }
+            next:
+              $ref: "#/components/schemas/ActionNext"
+        - type: object
+          required: [status, error]
+          properties:
+            status:
+              type: string
+              enum: [ERROR]
+            error:
+              $ref: "#/components/schemas/ActionError"
+            next:
+              $ref: "#/components/schemas/ActionNext"
 
     ActionResponse_Start:
-      type: object
-      required: [status, result]
-      properties:
-        status: { $ref: "#/components/schemas/ActionStatus" }
-        result:
-          type: object
-          required: [room_id, phase]
+      oneOf:
+        - type: object
+          required: [status, result]
           properties:
-            room_id: { type: string }
-            phase: { $ref: "#/components/schemas/SessionPhase" }
-        next: { $ref: "#/components/schemas/ActionNext" }
-        error: { $ref: "#/components/schemas/ActionError" }
+            status:
+              type: string
+              enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION]
+            result:
+              type: object
+              required: [room_id, phase]
+              properties:
+                room_id: { type: string }
+                phase: { $ref: "#/components/schemas/SessionPhase" }
+            next:
+              $ref: "#/components/schemas/ActionNext"
+        - type: object
+          required: [status, error]
+          properties:
+            status:
+              type: string
+              enum: [ERROR]
+            error:
+              $ref: "#/components/schemas/ActionError"
+            next:
+              $ref: "#/components/schemas/ActionNext"
 
     ActionResponse_GetState:
-      type: object
-      required: [status, result]
-      properties:
-        status: { $ref: "#/components/schemas/ActionStatus" }
-        result:
-          type: object
-          required: [state]
+      oneOf:
+        - type: object
+          required: [status, result]
           properties:
-            state: { $ref: "#/components/schemas/SessionState" }
-        next: { $ref: "#/components/schemas/ActionNext" }
-        error: { $ref: "#/components/schemas/ActionError" }
+            status:
+              type: string
+              enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION]
+            result:
+              type: object
+              required: [state]
+              properties:
+                state: { $ref: "#/components/schemas/SessionState" }
+            next:
+              $ref: "#/components/schemas/ActionNext"
+        - type: object
+          required: [status, error]
+          properties:
+            status:
+              type: string
+              enum: [ERROR]
+            error:
+              $ref: "#/components/schemas/ActionError"
+            next:
+              $ref: "#/components/schemas/ActionNext"
 
     ActionResponse_SendChat:
-      type: object
-      required: [status, result]
-      properties:
-        status: { $ref: "#/components/schemas/ActionStatus" }
-        result:
-          type: object
-          required: [room_id, accepted]
+      oneOf:
+        - type: object
+          required: [status, result]
           properties:
-            room_id: { type: string }
-            accepted: { type: boolean }
-        next: { $ref: "#/components/schemas/ActionNext" }
-        error: { $ref: "#/components/schemas/ActionError" }
+            status:
+              type: string
+              enum: [SUCCESS, PENDING, REQUIRES_USER_CONFIRMATION]
+            result:
+              type: object
+              required: [room_id, accepted]
+              properties:
+                room_id: { type: string }
+                accepted: { type: boolean }
+            next:
+              $ref: "#/components/schemas/ActionNext"
+        - type: object
+          required: [status, error]
+          properties:
+            status:
+              type: string
+              enum: [ERROR]
+            error:
+              $ref: "#/components/schemas/ActionError"
+            next:
+              $ref: "#/components/schemas/ActionNext"

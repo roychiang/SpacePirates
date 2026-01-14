@@ -35,7 +35,6 @@ const app = express();
 const allowed = (process.env.ALLOWED_ORIGINS || "*").split(",").map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: (origin, cb) => { if (!origin || allowed.includes("*") || allowed.includes(origin)) { cb(null, true) } else { cb(null, false) } }, credentials: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../public")));
 
 const httpServer: HttpServer = createServer(app);
 const transport = new WebSocketTransport({
