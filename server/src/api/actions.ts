@@ -151,6 +151,26 @@ router.post("/create_session", checkAuth, async (req, res) => {
              gameMode = "quick";
         }
 
+        // Special handling for Quick/Local modes:
+        // Do not create a server-side room. Instead, return a deep link to client-side mode.
+        if (gameMode === "quick") {
+            let url = "https://www.spacepirates.app/?mode=quick";
+            if (mission) {
+                url += `&mission=${mission}`;
+            }
+            
+            return res.json({
+                status: "SUCCESS",
+                result: {
+                    room_id: "local_session", // Placeholder for schema compliance
+                    host_player_id: "local_user"
+                },
+                next: {
+                    open_url: url
+                }
+            });
+        }
+
         const roomOptions = {
             name: (metadata && metadata.name) || roomName,
             game_mode: gameMode,
