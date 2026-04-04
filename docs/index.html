@@ -1,36 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Space Pirates — Multiplayer 3D Space Combat Game | Babylon.js</title>
-
-  <!-- SEO Meta -->
-  <meta name="description" content="Space Pirates is a free multiplayer 3D space shooter built with Babylon.js. Battle AI enemies solo or team up in real-time co-op. Play instantly in your browser — no download required.">
-  <meta name="keywords" content="space pirates, 3d space game, multiplayer space shooter, babylon.js game, browser game, webgl game, co-op space combat, free browser game">
-  <meta name="author" content="Space Pirates">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://www.spacepirates.app/">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Space Pirates — Multiplayer 3D Space Combat Game">
-  <meta property="og:description" content="Free multiplayer 3D space shooter in your browser. Battle AI enemies solo or team up in real-time co-op. Built with Babylon.js.">
-  <meta property="og:url" content="https://www.spacepirates.app/">
-  <meta property="og:site_name" content="Space Pirates">
-  <meta property="og:image" content="https://www.spacepirates.app/assets/SpacePirates_og.jpg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Space Pirates — Multiplayer 3D Space Combat Game">
-  <meta name="twitter:description" content="Free multiplayer 3D space shooter in your browser. Battle AI enemies solo or team up in real-time co-op.">
-  <meta name="twitter:image" content="https://www.spacepirates.app/assets/SpacePirates_og.jpg">
-
-  <!-- JSON-LD: VideoGame Schema -->
-  <script type="application/ld+json">
-  {
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Space Pirates — Multiplayer 3D Space Combat Game | Babylon.js</title><meta name="description" content="Space Pirates is a free multiplayer 3D space shooter built with Babylon.js. Battle AI enemies solo or team up in real-time co-op. Play instantly in your browser — no download required."><meta name="keywords" content="space pirates, 3d space game, multiplayer space shooter, babylon.js game, browser game, webgl game, co-op space combat, free browser game"><meta name="author" content="Space Pirates"><meta name="robots" content="index, follow"><link rel="canonical" href="https://www.spacepirates.app/"><meta property="og:type" content="website"><meta property="og:title" content="Space Pirates — Multiplayer 3D Space Combat Game"><meta property="og:description" content="Free multiplayer 3D space shooter in your browser. Battle AI enemies solo or team up in real-time co-op. Built with Babylon.js."><meta property="og:url" content="https://www.spacepirates.app/"><meta property="og:site_name" content="Space Pirates"><meta property="og:image" content="https://www.spacepirates.app/assets/SpacePirates_og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Space Pirates — Multiplayer 3D Space Combat Game"><meta name="twitter:description" content="Free multiplayer 3D space shooter in your browser. Battle AI enemies solo or team up in real-time co-op."><meta name="twitter:image" content="https://www.spacepirates.app/assets/SpacePirates_og.jpg"><script type="application/ld+json">{
     "@context": "https://schema.org",
     "@type": "VideoGame",
     "name": "Space Pirates",
@@ -75,12 +43,7 @@
       "https://spacepirates.babylonjs.com/",
       "https://www.viverse.com/"
     ]
-  }
-  </script>
-
-  <!-- JSON-LD: Organization Schema -->
-  <script type="application/ld+json">
-  {
+  }</script><script type="application/ld+json">{
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Space Pirates",
@@ -90,12 +53,7 @@
       "https://spacepirates.babylonjs.com/",
       "https://www.viverse.com/"
     ]
-  }
-  </script>
-
-  <!-- JSON-LD: FAQPage Schema -->
-  <script type="application/ld+json">
-  {
+  }</script><script type="application/ld+json">{
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
@@ -148,48 +106,8 @@
         }
       }
     ]
-  }
-  </script>
-
-  <!-- VIVERSE SDK -->
-  <script>
-    if (!window.viverse && !window.parent.viverse) {
+  }</script><script>if (!window.viverse && !window.parent.viverse) {
         var script = document.createElement('script');
         script.src = "https://www.viverse.com/static-assets/viverse-sdk/index.umd.cjs";
         document.head.appendChild(script);
-    }
-  </script>
-  <script>
-    console.log("[Page] VIVERSE UMD", !!(globalThis.viverse && globalThis.viverse.client))
-  </script>
-<script defer src="./bundle.js"></script></head>
-<body>
-  <div id="app"></div>
-
-  <!-- Crawlable content for search engines and AI bots (hidden when JS runs) -->
-  <noscript>
-    <div style="max-width: 800px; margin: 40px auto; padding: 20px; font-family: system-ui, sans-serif; color: #e0e0e0; background: #0a0a2e;">
-      <h1>Space Pirates — Multiplayer 3D Space Combat Game</h1>
-      <p>Space Pirates is a free, browser-based multiplayer 3D space shooter built with Babylon.js and WebGL. No download required — play instantly in any modern web browser.</p>
-
-      <h2>Game Features</h2>
-      <ul>
-        <li><strong>Single Player</strong>: Battle AI-controlled enemy ships across challenging missions</li>
-        <li><strong>Co-op Multiplayer</strong>: Team up with friends in real-time peer-to-peer space combat</li>
-        <li><strong>Global Leaderboards</strong>: Compete for the highest score, most kills, and longest win streaks</li>
-        <li><strong>3D Space Combat</strong>: Stunning WebGL graphics with post-processing effects</li>
-        <li><strong>VIVERSE Integration</strong>: Social login, avatars, and cross-platform play</li>
-        <li><strong>Controller Support</strong>: Full gamepad support alongside keyboard and mouse</li>
-      </ul>
-
-      <h2>How to Play</h2>
-      <p>Use WASD or Arrow Keys to maneuver your ship. Aim and fire with the mouse. Press Spacebar for boost. Full gamepad support is also available.</p>
-
-      <h2>About</h2>
-      <p>Originally created as a demo for the Babylon.js 5.0 release, Space Pirates has grown into a fully-featured multiplayer space combat game. The game uses Colyseus for real-time game state synchronization and PeerJS for peer-to-peer co-op gameplay.</p>
-
-      <p>Please enable JavaScript to play Space Pirates.</p>
-    </div>
-  </noscript>
-</body>
-</html>
+    }</script><script>console.log("[Page] VIVERSE UMD", !!(globalThis.viverse && globalThis.viverse.client))</script><script defer="defer" src="./bundle.js"></script></head><body><div id="app"></div><noscript><div style="max-width: 800px; margin: 40px auto; padding: 20px; font-family: system-ui, sans-serif; color: #e0e0e0; background: #0a0a2e;"><h1>Space Pirates — Multiplayer 3D Space Combat Game</h1><p>Space Pirates is a free, browser-based multiplayer 3D space shooter built with Babylon.js and WebGL. No download required — play instantly in any modern web browser.</p><h2>Game Features</h2><ul><li><strong>Single Player</strong>: Battle AI-controlled enemy ships across challenging missions</li><li><strong>Co-op Multiplayer</strong>: Team up with friends in real-time peer-to-peer space combat</li><li><strong>Global Leaderboards</strong>: Compete for the highest score, most kills, and longest win streaks</li><li><strong>3D Space Combat</strong>: Stunning WebGL graphics with post-processing effects</li><li><strong>VIVERSE Integration</strong>: Social login, avatars, and cross-platform play</li><li><strong>Controller Support</strong>: Full gamepad support alongside keyboard and mouse</li></ul><h2>How to Play</h2><p>Use WASD or Arrow Keys to maneuver your ship. Aim and fire with the mouse. Press Spacebar for boost. Full gamepad support is also available.</p><h2>About</h2><p>Originally created as a demo for the Babylon.js 5.0 release, Space Pirates has grown into a fully-featured multiplayer space combat game. The game uses Colyseus for real-time game state synchronization and PeerJS for peer-to-peer co-op gameplay.</p><p>Please enable JavaScript to play Space Pirates.</p></div></noscript></body></html>

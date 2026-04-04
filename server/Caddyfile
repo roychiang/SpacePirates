@@ -5,7 +5,7 @@
     # Bot detection: serve static landing page to crawlers and AI bots
     @bot {
         not path /assets/* /robots.txt /sitemap.xml /llms.txt /openapi.yaml /static-landing.html /.well-known/*
-        header_regexp User-Agent (?i)(googlebot|bingbot|slurp|duckduckbot|yandexbot|baiduspider|GPTBot|ChatGPT-User|ClaudeBot|anthropic-ai|PerplexityBot|Google-Extended|GoogleOther|cohere-ai|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Discordbot|TelegramBot)
+        header_regexp ua User-Agent (?i)(googlebot|bingbot|slurp|duckduckbot|yandexbot|baiduspider|GPTBot|ChatGPT-User|ClaudeBot|anthropic-ai|PerplexityBot|Google-Extended|GoogleOther|cohere-ai|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Discordbot|TelegramBot|Applebot|Bytespider|CCBot|DataForSeoBot|ia_archiver)
     }
     rewrite @bot /static-landing.html
 

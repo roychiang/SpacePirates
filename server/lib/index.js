@@ -55,7 +55,6 @@ app.use((0, cors_1.default)({ origin: (origin, cb) => { if (!origin || allowed.i
         cb(null, false);
     } }, credentials: true }));
 app.use(express_1.default.json());
-app.use(express_1.default.static(path_1.default.join(__dirname, "../public")));
 const httpServer = (0, http_1.createServer)(app);
 const transport = new ws_transport_1.WebSocketTransport({
     perMessageDeflate: false,
@@ -125,6 +124,8 @@ const actions_1 = require("./api/actions");
 gameServer.define("game_room", GameRoom_1.GameRoom)
     .enableRealtimeListing();
 app.use("/api/actions", actions_1.actionsRouter);
+// Serve static files from public (e.g. .well-known/agent.json, openapi.yaml)
+app.use(express_1.default.static(path_1.default.join(__dirname, "..", "public")));
 app.get("/api/leaderboard/:alias", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const alias = req.params.alias;
     try {

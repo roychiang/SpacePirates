@@ -24,6 +24,13 @@ const checkAuth = (req, res, next) => {
         });
     }
     const token = authHeader.split(" ")[1];
+    // DEV: Allow simple API Key for testing
+    // To enable, set SP_DEV_API_KEY in .env
+    const devKey = process.env.SP_DEV_API_KEY;
+    if (devKey && token === devKey) {
+        req.agent = { sub: "dev-user", name: "Developer" };
+        return next();
+    }
     // In a real environment, verify signature using SP_JWT_PUBLIC_KEY
     // For now, we decode and check structure/expiry
     try {
@@ -108,16 +115,67 @@ router.post("/get_state", checkAuth, (req, res) => __awaiter(void 0, void 0, voi
 router.post("/create_session", checkAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { mode, max_players, min_players_to_start, visibility, metadata } = req.body;
-        if (mode && !["co-op", "pvp", "quick"].includes(mode)) {
+        const validModes = ["co-op", "pvp", "quick", "quick_solo", "quick_squad", "quick_battle"];
+        if (mode && !validModes.includes(mode)) {
             return errorResponse(res, 400, "INVALID_ARGUMENT", "Invalid mode");
         }
+        let gameMode = "coop";
+        let mission;
+        let defaultMax = 4;
+        let defaultMin = 2;
+        let roomName = "Agent Room";
+        if (mode === "pvp") {
+            gameMode = "pvp";
+            roomName = "PVP Match";
+        }
+        else if (mode === "quick_solo") {
+            gameMode = "quick";
+            mission = "solo";
+            defaultMax = 1;
+            defaultMin = 1;
+            roomName = "Solo Mission";
+        }
+        else if (mode === "quick_squad") {
+            gameMode = "quick";
+            mission = "squad";
+            roomName = "Squad Mission";
+        }
+        else if (mode === "quick_battle") {
+            gameMode = "quick";
+            mission = "battle";
+            roomName = "Quick Battle";
+        }
+        else if (mode === "quick") {
+            gameMode = "quick";
+        }
+        // Special handling for Quick/Local modes:
+        // Do not create a server-side room. Instead, return a deep link to client-side mode.
+        if (gameMode === "quick") {
+            let url = "https://www.spacepirates.app/?mode=quick";
+            if (mission) {
+                url += `&mission=${mission}`;
+            }
+            return res.json({
+                status: "SUCCESS",
+                result: {
+                    room_id: "local_session", // Placeholder for schema compliance
+                    host_player_id: "local_user"
+                },
+                next: {
+                    open_url: url
+                }
+            });
+        }
         const roomOptions = {
-            name: (metadata && metadata.name) || "Agent Room",
-            game_mode: mode === "pvp" ? "pvp" : "coop",
-            maxPlayers: max_players || 4,
-            minPlayers: min_players_to_start || 2,
+            name: (metadata && metadata.name) || roomName,
+            game_mode: gameMode,
+            maxPlayers: max_players || defaultMax,
+            minPlayers: min_players_to_start || defaultMin,
             properties: Object.assign(Object.assign({}, metadata), { created_by: "agent" })
         };
+        if (mission) {
+            roomOptions.properties.mission = mission;
+        }
         const reservation = yield colyseus_1.matchMaker.create("game_room", roomOptions);
         res.json({
             status: "SUCCESS",
