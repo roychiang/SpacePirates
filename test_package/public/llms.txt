@@ -1,0 +1,51 @@
+# Space Pirates
+
+> A multiplayer 3D space combat game built with Babylon.js, playable in your browser.
+
+Space Pirates is an open-source browser-based 3D space shooter featuring both single-player and real-time multiplayer modes. Originally created as a demo for the Babylon.js 5.0 release, it has evolved into a full-featured game with leaderboards, VIVERSE integration, and peer-to-peer co-op gameplay.
+
+## Game Overview
+
+- **Genre**: 3D Space Shooter / Arcade
+- **Platform**: Web browser (desktop & mobile)
+- **Engine**: Babylon.js 5.x (WebGL)
+- **Multiplayer**: Real-time via Colyseus + PeerJS (P2P co-op)
+- **Website**: https://www.spacepirates.app/
+- **Source Code**: Open source, based on the Babylon.js Space Pirates demo
+
+## Features
+
+- Single-player campaign with AI enemies
+- Real-time multiplayer co-op via peer-to-peer connections
+- Global leaderboards tracking kills, wins, and scores
+- VIVERSE platform integration for social login and avatars
+- 3D space combat with ship upgrades and power-ups
+- WebGL rendering with post-processing effects
+- Responsive controls supporting keyboard, mouse, and gamepad
+
+## Game Modes
+
+- **Single Player**: Solo missions against AI-controlled enemies
+- **Co-op Multiplayer**: Team up with other players in real-time P2P sessions
+- **Competitive**: Compete for high scores on global leaderboards
+
+## Controls
+
+- **WASD / Arrow Keys**: Ship movement
+- **Mouse**: Aim and shoot
+- **Spacebar**: Special ability / boost
+- **Gamepad**: Full controller support
+
+## Technical Stack
+
+- Frontend: Babylon.js 5.x, TypeScript, Webpack
+- Backend: Node.js, Express, Colyseus (WebSocket game server)
+- Networking: PeerJS for P2P, WebSocket for game state sync
+- Auth: VIVERSE OIDC integration
+- Analytics: Talo game analytics and leaderboards
+
+## Links
+
+- Play: https://www.spacepirates.app/
+- Original Demo: https://spacepirates.babylonjs.com/
+- API Documentation: https://www.spacepirates.app/openapi.yaml

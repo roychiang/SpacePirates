@@ -18,13 +18,42 @@ export class Matchmaking extends State {
   private selectedRoomId?: string
   private listedRooms: any[] = []
   private joinBtn?: Button
-  private onConnected = async () => { await this.ensureActor(); /* this.refreshRooms() removed to avoid overwriting event data */ }
+  private onConnected = async () => { 
+      await this.ensureActor(); 
+      if (this.autoJoinId) {
+          await this.executeJoin(this.autoJoinId);
+      }
+      /* this.refreshRooms() removed to avoid overwriting event data */ 
+  }
   private onRoomListUpdated = (payload: any) => { const rooms = (payload && payload.rooms) ? payload.rooms : []; this.refreshRooms(rooms) }
   public pvpMode: boolean = false // Track whether PvP or Co-op mode is selected
   private _isActionProcessing: boolean = false;
+  private autoJoinId?: string;
+
+  private async executeJoin(rid: string) {
+      if (this._isActionProcessing) return;
+      this._isActionProcessing = true;
+      try {
+        console.log("[UI] Executing join for", rid);
+        const res = await playService.joinRoom(rid)
+        if (!res.success) {
+          console.log("[UI] join room failed", res.message)
+          return
+        }
+        await playService.ensureActorPresentInRoom()
+        State.setCurrent(States.lobby)
+      } catch (e) {
+        console.error("[UI] join room error", e)
+      } finally {
+        this._isActionProcessing = false;
+      }
+  }
 
   public enter() {
     this._isActionProcessing = false;
+    const urlParams = new URLSearchParams(window.location.search);
+    this.autoJoinId = urlParams.get("join") || undefined;
+    
     super.enter()
     if (!this._adt) return
     const adt = this._adt

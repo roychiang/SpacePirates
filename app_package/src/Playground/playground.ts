@@ -51,8 +51,19 @@ class Playground {
             const urlParams = new URLSearchParams(window.location.search);
             const mode = urlParams.get("mode");
             const mission = urlParams.get("mission");
-            
-            if (mode === "quick" || mode === "single") {
+            const joinRoomId = urlParams.get("join");
+
+            if (joinRoomId) {
+                console.log("[Playground] Auto-joining room requested:", joinRoomId);
+                const goToMatchmaking = () => {
+                     State.setCurrent(States.matchmaking);
+                };
+                if (Assets.loadingComplete) {
+                    goToMatchmaking();
+                } else {
+                    Assets.onLoadingCompleteObservable.addOnce(goToMatchmaking);
+                }
+            } else if (mode === "quick" || mode === "single") {
                 console.log("[Playground] Auto-starting Single Player (Quick Mode)");
                 const startQuickPlay = () => {
                     const overrideDefinition = new GameDefinition();
